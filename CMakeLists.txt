@@ -52,18 +52,13 @@ set(SOURCE_FILES
 # 头文件引用目录
 include_directories(
         ./
-        /usr/local/Cellar/glog/0.3.5_3/include
-        /usr/local/Cellar/gflags/2.2.1/include
-        /usr/local/Cellar/tinyxml2/3.0.0/include
-        /usr/local/Cellar/libev/4.22/include/
+        /usr/local/include/
 )
 
 # 库文件目录
 link_directories(
         ./
-        /usr/local/Cellar/libev/4.22/lib/
-        /usr/local/Cellar/tinyxml2/3.0.0/lib/
-        /usr/local/Cellar/glog/0.3.5_3/lib
+        /usr/local/lib/
 )
 
 # 链接的库文件
