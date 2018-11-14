@@ -11,32 +11,23 @@ set(SOURCE_FILES
         net/ev/MyLoop.h
         net/ev/MyWatcher.h
         net/protocol/MyCodec.h
-        net/server/MyContext.cc
-        net/server/MyContext.h
-        net/server/MyServer.cc
-        net/server/MyServer.h
-        net/socket/MySocket.cc
-        net/socket/MySocket.h
-        net/MyGlobal.cc
-        net/MyGlobal.h
-        util/MyCommon.cc
-        util/MyCommon.h
-        util/MyConfig.cc
-        util/MyConfig.h
+        net/server/MyContext.cc net/server/MyContext.h
+        net/server/MyServer.cc net/server/MyServer.h
+        net/socket/MySocket.cc net/socket/MySocket.h
+        net/MyGlobal.cc net/MyGlobal.h
+        util/MyCommon.cc util/MyCommon.h
+        util/MyConfig.cc util/MyConfig.h
         util/MyException.h
         util/MyFactory.h
-        util/MyPropertyTree.cc
-        util/MyPropertyTree.h
+        util/MyPropertyTree.cc util/MyPropertyTree.h
         util/MyQueue.h
         util/MyRandom.h
         util/MySingleton.h
         util/MyThreadPool.h
         util/MyTimeoutMap.h
-        util/MyTimeProvider.cc
-        util/MyTimeProvider.h
+        util/MyTimeProvider.cc util/MyTimeProvider.h
         util/MyVariant.h
-        net/server/MyServant.cc
-        net/server/MyServant.h
+        net/server/MyServant.cc net/server/MyServant.h
         net/server/MyDispatcher.cc net/server/MyDispatcher.h
         net/server/MyChannel.cc net/server/MyChannel.h
         net/protocol/MyCodec.h
