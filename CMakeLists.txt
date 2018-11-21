@@ -34,11 +34,20 @@ set(SOURCE_FILES
         net/protocol/MyMessage.cc net/protocol/MyMessage.h
         net/demo/MyDemoDispatcher.cc net/demo/MyDemoDispatcher.h
         net/demo/MyDemoMessage.h
-        main.cpp net/server/MyFilter.cc net/server/MyFilter.h
+        net/server/MyFilter.cc net/server/MyFilter.h
         net/demo/MyDemoHandler.cc net/demo/MyDemoHandler.h
         net/server/MyHandler.h
         net/demo/MyDemoCodec.h
-        net/server/EventLoop.cc net/server/EventLoop.h)
+        net/server/EventLoop.cc net/server/EventLoop.h
+        net/client/MyClient.cc net/client/MyClient.h
+        net/client/MyProxy.cc net/client/MyProxy.h
+        net/client/ClientLoop.cc net/client/ClientLoop.h
+        net/client/MyRequest.h
+        net/demo/MyDemoProxy.cc net/demo/MyDemoProxy.h)
+
+set(SERVER_MAIN main.cpp)
+
+set(CLIENT_MAIN client.cc net/client/MyCommunicator.h)
 
 # 头文件引用目录
 include_directories(
@@ -56,4 +65,5 @@ link_directories(
 link_libraries(ev tinyxml2 glog)
 
 # 可执行程序列表
-add_executable(MyFramework2 ${SOURCE_FILES})
+add_executable(MyFramework2 ${SOURCE_FILES} ${SERVER_MAIN})
+add_executable(Client ${SOURCE_FILES} client.cc ${CLIENT_MAIN})

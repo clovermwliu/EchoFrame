@@ -83,7 +83,7 @@ namespace MF {
         }
 
         void MyTcpServant::onRead(EV::MyWatcher* watcher) {
-            LOG(INFO) << "MyTcpServant::onRead" << std::endl;
+            LOG(INFO) << "MyTcpServant::onConnect" << std::endl;
             //1. 获取uid
             uint32_t uid = dynamic_cast<EV::MyIOWatcher*>(watcher)->getUid();
 

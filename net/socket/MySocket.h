@@ -81,6 +81,12 @@ namespace MF {
              *
              */
             int32_t connect(const std::string& host, uint16_t port);
+
+            /**
+             * 获取connect结果
+             * @return 0 成功 其他 失败
+             */
+            int32_t getConnectResult() const ;
             
             /**
              *  @brief 接受一个新的连接

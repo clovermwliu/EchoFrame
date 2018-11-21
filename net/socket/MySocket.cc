@@ -78,6 +78,13 @@ namespace MF {
 
             return rv;
         }
+
+        int32_t MySocket::getConnectResult() const {
+            int32_t error;
+            uint32_t len = 0;
+            getsockopt(fd, SOL_SOCKET, SO_ERROR, static_cast<void*>(&error), &len);
+            return error;
+        }
         
         int32_t MySocket::accept(MySocket* client) {
             

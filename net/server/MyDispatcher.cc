@@ -26,7 +26,7 @@ namespace MF {
 
             //2. 发送响应
             if (context->isNeedResponse() && rsp->getReadableLength() > 0) {
-                context->sendMessage(std::move(rsp));
+                context->sendPayload(std::move(rsp));
             }
             return rv;
         }

@@ -17,17 +17,17 @@ namespace MF {
         : channel(channel) {
         }
 
-        void MyContext::sendMessage(const char *buf, uint32_t len) {
+        void MyContext::sendPayload(const char *buf, uint32_t len) {
             auto c = channel.lock();
             if (c == nullptr || c->sendResponse(buf, len) != len) {
                 LOG(ERROR) << "send response fail, len: " << len << std::endl;
             }
         }
 
-        void MyContext::sendMessage(std::unique_ptr<MF::Buffer::MyIOBuf> iobuf) {
+        void MyContext::sendPayload(std::unique_ptr<MF::Buffer::MyIOBuf> iobuf) {
             char* buf = static_cast<char*>(iobuf->readable());
             uint32_t length = iobuf->getReadableLength();
-            return sendMessage(buf, length);
+            return sendPayload(buf, length);
         }
 
         void MyContext::close() {

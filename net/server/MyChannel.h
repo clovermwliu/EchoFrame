@@ -103,7 +103,7 @@ namespace MF {
             uint32_t  uid{0}; //连接的标识id
 
             Socket::MySocket* socket{nullptr}; //socket
-            EV::MyIOWatcher* readWatcher; //readWatcher;
+            EV::MyIOWatcher* readWatcher; //connectWatcher;
             EV::MyAsyncWatcher* writeWatcher; //writeWatcher;
             EV::MyTimerWatcher* timeoutWatcher; //timeout watcher
             EventLoop* loop; //事件循环

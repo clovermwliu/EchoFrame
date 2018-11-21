@@ -22,20 +22,20 @@ namespace MF {
              * 构造函数
              * @param channel 连接
              */
-            MyContext(const std::weak_ptr<MyChannel> &channel);
+            explicit MyContext(const std::weak_ptr<MyChannel> &channel);
 
             /**
              * 发送响应
              * @param buf buffer
              * @param len length
              */
-            void sendMessage(const char *buf, uint32_t len);
+            void sendPayload(const char *buf, uint32_t len);
 
             /**
              * 发送响应
              * @param iobuf iobuf
              */
-            void sendMessage(std::unique_ptr<Buffer::MyIOBuf> iobuf);
+            void sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf);
 
             /**
              * 关闭连接
