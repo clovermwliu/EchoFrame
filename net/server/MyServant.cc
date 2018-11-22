@@ -116,7 +116,7 @@ namespace MF {
                 //数据包不完整，那么就等待下一次数据
                 LOG(INFO) << "packet incomplete, uid: " << uid << ", length: " << len << std::endl;
             } else if (rv == kPacketStatusError) {
-                //数据包出错了, 需要断开连接
+                //数据包出错了, 需std::move(要断开连接)
                 LOG(ERROR) << "packet error, uid: " << uid << ", length: " << len << std::endl;
                 onReadError(channel);
             } else if (rv == kPacketStatusComplete) {
@@ -218,6 +218,10 @@ namespace MF {
             //保存iothread
             channel->setLoop(ioLoop);
             loopManager->addChannel(channel);
+
+            LOG(INFO) << "client connected, ip: " << socket->getRemoteHost()
+            << ", port: " << socket->getRemotePort()
+            << ", uid: " << channel->getUid() << std::endl;
         }
 
         void MyTcpServant::onReadComplete(std::shared_ptr<MyChannel> channel, const char* buf, uint32_t len) {

@@ -93,6 +93,8 @@ namespace MF {
                 return loop;
             }
 
+            uint32_t getConnectTime() const;
+
             /**
              * 新增request
              * @param request request
@@ -181,6 +183,8 @@ namespace MF {
             ClientConfig config;
 
             std::map<uint64_t ,std::shared_ptr<MyBaseRequest>> requests;// 已经发出的所有request
+
+            uint32_t connectTime; //连接开始的时间
         };
 
         /**

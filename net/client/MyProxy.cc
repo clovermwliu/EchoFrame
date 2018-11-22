@@ -4,6 +4,7 @@
 
 #include "net/client/MyProxy.h"
 #include "net/client/ClientLoop.h"
+#include "util/MyTimeProvider.h"
 
 namespace MF {
     namespace Client {
@@ -26,9 +27,16 @@ namespace MF {
             auto loop = loops->getByServantId(client->getServantId());
             auto future = client->asyncConnect(config, loop).share();
             auto self = shared_from_this();
-            loop->RunInThreadAfterDelay([self, client, future, config] () -> void {
-                if(future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            loop->RunInThreadAfterDelayAndRepeat([self, client, future, config] (EV::MyTimerWatcher* watcher) -> void {
+                //检查是否超时
+                if (MyTimeProvider::now() - client->getConnectTime() >= config.timeout) {
                     LOG(ERROR) << "connect timeout, host: " << config.host << ", port:" << config.port << std::endl;
+                    //关闭watcher
+                    EV::MyWatcherManager::GetInstance()->destroy(watcher);
+                    return;
+                }
+                //检查是否已经ready
+                if(future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
                     return;
                 }
                 //promise返回了
@@ -36,7 +44,7 @@ namespace MF {
                 if (rv != 0) { //链接失败
                     LOG(INFO) << "tcp client connect success, host: "
                               << config.host << ", port: " << config.port
-                              << " ,error: " << strerror(rv) << std::endl;
+                              << std::endl;
                     return;
                 }
 
@@ -48,6 +56,9 @@ namespace MF {
                 auto readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
                         std::bind(&MyProxy::onRead, self.get(), std::placeholders::_1), client->getUid(), EV_READ);
 
+                //设置uid
+                readWatcher->setUid(client->getUid());
+
                 //watcher保存到事件循环
                 client->getLoop()->add(readWatcher);
                 client->setReadWatcher(readWatcher); //保存readwatcher
@@ -55,7 +66,10 @@ namespace MF {
                 //保存client
                 self->loops->addClient(client);
                 self->clients.pushBack(std::weak_ptr<MyClient>(client));
-            }, config.timeout);
+
+                //关闭定时器
+                EV::MyWatcherManager::GetInstance()->destroy(watcher);
+            }, 1, 1);
 
             return 0;
         }
@@ -98,10 +112,6 @@ namespace MF {
             int32_t rv = client->onRead(&buf, &len);
             if (rv < 0) {
                 LOG(ERROR) << "read error, uid:" << uid << std::endl;
-                loops->removeClient(client);
-                return;
-            } else if (rv == 0) {
-                LOG(ERROR) << "server disconnected, uid: " << uid << std::endl;
                 loops->removeClient(client);
                 return;
             }
@@ -210,6 +220,10 @@ namespace MF {
                LOG(ERROR) << "find request fail, requestId: " << magicMsg->getRequestId() << std::endl;
                return ;
            }
+           //将request从client 中删除
+           client->removeRequest(magicMsg->getRequestId());
+
+           //处理消息
            auto m = magicMsg.release();
            auto self = dynamic_pointer_cast<ServantProxy>(shared_from_this());
            this->handlerExecutor->exec([self, m, request] () -> int32_t{

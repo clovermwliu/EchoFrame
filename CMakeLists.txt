@@ -43,11 +43,14 @@ set(SOURCE_FILES
         net/client/MyProxy.cc net/client/MyProxy.h
         net/client/ClientLoop.cc net/client/ClientLoop.h
         net/client/MyRequest.h
-        net/demo/MyDemoProxy.cc net/demo/MyDemoProxy.h)
+        net/demo/MyDemoProxy.cc net/demo/MyDemoProxy.h
+        net/magic/MyMagicCodec.h
+        net/magic/MyMagicDispatcher.h net/magic/MyMagicDispatcher.cc
+        net/client/MyCommunicator.h)
 
 set(SERVER_MAIN main.cpp)
 
-set(CLIENT_MAIN client.cc net/client/MyCommunicator.h)
+set(CLIENT_MAIN client.cc)
 
 # 头文件引用目录
 include_directories(

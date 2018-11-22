@@ -19,7 +19,7 @@ namespace MF {
             std::unique_ptr<Buffer::MyIOBuf> rsp;
             int32_t rv;
             if((rv = dispatchPacket(req, rsp, context)) != kHandleResultSuccess) {
-                LOG(ERROR) << "dispatch packet fail, close connection" << std::endl;
+                LOG(ERROR) << "dispatchPayload packet fail, close connection" << std::endl;
                 context->close();
                 return rv;
             }

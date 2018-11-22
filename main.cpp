@@ -41,9 +41,9 @@ int main(int argc, const char * argv[]) {
     servantConfig.name = "testServant";
     servantConfig.host = "0.0.0.0";
     servantConfig.port = 8888;
-    servantConfig.timeout = 10;
+    servantConfig.timeout = 3600;
     servantConfig.handlerThreadCount = 1;
-    MyDemoDispatcher* dispatcher = new MyDemoDispatcher(new MyDemoCodec());
+    MyDemoDispatcher* dispatcher = new MyDemoDispatcher();
     if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {
         LOG(ERROR) << "create servant fail" << std::endl;
         return 0;

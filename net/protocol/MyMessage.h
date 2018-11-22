@@ -67,6 +67,25 @@ namespace MF {
 
             void setPayload(std::unique_ptr<Buffer::MyIOBuf> payload);
 
+
+        public:
+
+            /**
+             * 解析消息长度
+             * @param buf 数据流
+             * @param length 数据长度
+             * @return 完整数据包长度
+             */
+            static uint32_t getPacketLength(const char *buf, uint32_t length);
+
+            /**
+             * 检查数据包是否完整
+             * @param buf buf
+             * @param length length
+             * @return 检查结果
+             */
+            static int32_t isPacketComplete(const char* buf, uint32_t length);
+
         protected:
             uint32_t length; //消息的总长度
             uint16_t version; //协议版本

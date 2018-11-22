@@ -8,8 +8,7 @@
 
 namespace MF {
     namespace DEMO {
-        MyDemoDispatcher::MyDemoDispatcher(Protocol::MyCodec *codec)
-        : MyDispatcher(codec) {
+        MyDemoDispatcher::MyDemoDispatcher() {
             //注册handler
             registerHandler<MyUserNameHandler>("username");
             registerHandler<MyPasswordHandler>("password");
@@ -33,7 +32,7 @@ namespace MF {
             return cmd;
         }
 
-        int32_t MyDemoDispatcher::dispatchPacket(const std::unique_ptr<Buffer::MyIOBuf>& request,
+        int32_t MyDemoDispatcher::dispatchPayload(const std::unique_ptr<Buffer::MyIOBuf>& request,
                                                  std::unique_ptr<Buffer::MyIOBuf> &response
                                                  , std::shared_ptr<Server::MyContext> context) {
 

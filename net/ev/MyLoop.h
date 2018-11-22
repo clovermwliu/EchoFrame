@@ -175,13 +175,14 @@ namespace MF {
                 //创建timer对象
                 auto func = [pred](MyWatcher* watcher) {
                     //执行任务
-                    pred();
+                    pred(reinterpret_cast<MyTimerWatcher*>(watcher));
                     
                     //释放watcher
                     MyWatcherManager::GetInstance()->destroy(watcher);
                 };
                 //生成定时器
-                add(MyWatcherManager::GetInstance()->create<MyTimerWatcher>(std::move(std::bind(pred, args...)), delay, 0));
+                add(MyWatcherManager::GetInstance()->create<MyTimerWatcher>(
+                        std::move(std::bind(func, std::placeholders::_1, args...)), delay, 0));
             }
             
             /**
@@ -195,14 +196,16 @@ namespace MF {
             template<typename Pred, class... Args>
             void RunInThreadAfterDelayAndRepeat(Pred&& pred, uint32_t delay, uint32_t repeat, Args... args) {
                 //创建timer对象
-                auto func = [pred](void* watcher) {
+                auto func = [pred](MyWatcher* watcher) {
                     //执行任务
-                    pred();
+                    pred(reinterpret_cast<MyTimerWatcher*>(watcher));
                 };
-                
+
                 //生成定时器
-                add(MyWatcherManager::GetInstance()->create<MyTimerWatcher>(std::move(std::bind(pred, args...)), delay, repeat));
+                add(MyWatcherManager::GetInstance()->create<MyTimerWatcher>(
+                        std::move(std::bind(func, std::placeholders::_1, args...)), delay, repeat));
             }
+
         protected:
             MyLoop(MyLoop& r) = delete; //不允许拷贝
             MyLoop& operator= (MyLoop& r) = delete; //不允许赋值

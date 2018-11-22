@@ -121,7 +121,9 @@ namespace MF {
                 callback_ = cb;
                 watcher_.data = (void*)this;
             }
-            
+
+            virtual ~MyWatcherBase() = default;
+
             /**
              *  @brief 判断是否是一个watcher类型
              *

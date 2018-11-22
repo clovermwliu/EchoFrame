@@ -81,6 +81,22 @@ namespace MF {
         void MyMagicMessage::setPayload(std::unique_ptr<Buffer::MyIOBuf> payload) {
             MyMagicMessage::payload = std::move(payload);
         }
+
+        uint32_t MyMagicMessage::getPacketLength(const char *buf, uint32_t length) {
+            if (buf == nullptr || length <= sizeof(uint32_t)) {
+                return 0;
+            }
+
+            uint32_t pl = 0;
+            memcpy(&pl, buf, sizeof(uint32_t));
+
+            return pl;
+        }
+
+        int32_t MyMagicMessage::isPacketComplete(const char *buf, uint32_t length) {
+            uint32_t packetLen = getPacketLength(buf, length);
+            return packetLen <= length ? kPacketStatusComplete : kPacketStatusIncomplete;
+        }
     }
 }
 

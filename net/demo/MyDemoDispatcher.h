@@ -5,19 +5,19 @@
 #ifndef MYFRAMEWORK2_MYDEMODISPATCHER_H
 #define MYFRAMEWORK2_MYDEMODISPATCHER_H
 
-#include "net/server/MyDispatcher.h"
-#include "MyDemoMessage.h"
+#include "net/magic/MyMagicDispatcher.h"
+#include "net/demo/MyDemoMessage.h"
 #include "net/demo/MyDemoHandler.h"
 
 namespace MF {
     namespace DEMO {
-        class MyDemoDispatcher : public Server::MyDispatcher{
+        class MyDemoDispatcher : public MAGIC::MyMagicDispatcher{
         public:
             /**
              * 构造函数
              * @param codec 编解码器
              */
-            MyDemoDispatcher(Protocol::MyCodec *codec);
+            MyDemoDispatcher();
 
         protected:
             /**
@@ -26,7 +26,7 @@ namespace MF {
              * @param response repsonse
              * @return 分发结果
              */
-            int32_t dispatchPacket(const std::unique_ptr<Buffer::MyIOBuf>& request,
+            int32_t dispatchPayload(const std::unique_ptr<Buffer::MyIOBuf>& request,
                                    std::unique_ptr<Buffer::MyIOBuf> &response
                                    , std::shared_ptr<Server::MyContext> context) override;
 

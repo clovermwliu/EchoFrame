@@ -69,6 +69,7 @@ namespace MF {
                     || err == EAGAIN
                     || err == EALREADY) {
                     isConnected = false;
+                    rv = 0;
                 } else {
                     rv = -1;
                 }
@@ -80,9 +81,9 @@ namespace MF {
         }
 
         int32_t MySocket::getConnectResult() const {
-            int32_t error;
+            int32_t error = 0;
             uint32_t len = 0;
-            getsockopt(fd, SOL_SOCKET, SO_ERROR, static_cast<void*>(&error), &len);
+            getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len);
             return error;
         }
         
