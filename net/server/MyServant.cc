@@ -11,9 +11,6 @@ namespace MF {
             loop = loopManager->getNextLoop();
         }
 
-        MyServant::~MyServant() {
-        }
-
         int32_t MyServant::initialize(const MF::Server::ServantConfig &config) {
             this->config = config;
 

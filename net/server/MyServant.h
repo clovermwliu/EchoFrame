@@ -41,7 +41,7 @@ namespace MF {
             /**
              * 析构函数
              */
-            virtual ~MyServant();
+            virtual ~MyServant() = default;
 
             /**
              * 初始化Servant
