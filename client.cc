@@ -24,6 +24,12 @@ using namespace MF::Socket;
 using namespace MF::DEMO;
 using namespace MF::Client;
 
+using DemoMsg = std::unique_ptr<MyDemoMessage<std::string>>;
+using DemoContext = std::shared_ptr<MyRequest<MyDemoMessage<std::string>, MyDemoMessage<std::string>>>;
+
+using Action = std::function<int32_t (
+        const std::unique_ptr<MyDemoMessage<std::string>>&
+                , const std::shared_ptr<MyRequest<MyDemoMessage<std::string>,MyDemoMessage<std::string>>>&)>;
 int main(int argc, const char * argv[]) {
 
     //初始化comm
@@ -47,20 +53,26 @@ int main(int argc, const char * argv[]) {
 
     //从控制台读取数据
     std::string line;
-    for (int i = 0; i < 1000; ++i) {
-        std::cin >> line;
+    while(true) {
+        std::string line;
+        std::getline(std::cin, line);
+        LOG(INFO) << "read line: " << line << std::endl;
         if (!line.empty()) {
             std::string cmd = line.substr(0, line.find(' '));
             std::string msg = line.substr(line.find(' ') + 1);
+
             auto req = std::move(std::unique_ptr<MyDemoMessage<std::string>>(
-                    new MyDemoMessage<std::string>(cmd, msg + "\r\n")));
-            auto rsp = std::move(proxy->buildRequest<
-                    MyDemoMessage<std::string>, MyDemoMessage<std::string>
-                    >(std::move(req))
-                    ->executeAndWait());
-
-            LOG(INFO) << "receive response: " << rsp->getCmd() << " " << rsp->getMsg() << std::endl;
-
+                    new MyDemoMessage<std::string>(cmd, msg)));
+            proxy
+            ->buildRequest<MyDemoMessage<std::string>, MyDemoMessage<std::string>>(std::move(req))
+            ->then([] (const DemoMsg& rsp, const DemoContext& context)
+            -> int32_t {
+                LOG(INFO) << "receive response: " << rsp->getCmd() << " " << rsp->getMsg() << std::endl;
+            })
+            .timeout([] (const DemoContext& context) -> int32_t {
+                LOG(INFO) << "request timeout" << std::endl;
+            })
+            .execute();
         }
     }
 

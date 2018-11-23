@@ -35,15 +35,21 @@ namespace MF {
             }
 
             //3. 编码消息
-            auto rspMsg = std::move(std::unique_ptr<Protocol::MyMagicMessage>(new Protocol::MyMagicMessage()));
-            rspMsg->setLength(rspMsg->headLen() + rspBuf->getReadableLength());
-            rspMsg->setRequestId(reqMsg->getRequestId());
-            rspMsg->setServerNumber(reqMsg->getServerNumber());
-            rspMsg->setIsRequest(0);
-            rspMsg->setVersion(reqMsg->getVersion());
-            rspMsg->setPayload(std::move(rspBuf));
+            if (context->isNeedResponse()) { //需要回复响应
+                auto rspMsg = std::move(std::unique_ptr<Protocol::MyMagicMessage>(new Protocol::MyMagicMessage()));
+                rspMsg->setRequestId(reqMsg->getRequestId());
+                rspMsg->setServerNumber(reqMsg->getServerNumber());
+                rspMsg->setIsRequest(0);
+                rspMsg->setVersion(reqMsg->getVersion());
 
-            response = std::move(rspMsg->encode());
+                if (rspBuf != nullptr) {
+                    rspMsg->setLength(rspMsg->headLen() + rspBuf->getReadableLength());
+                    rspMsg->setPayload(std::move(rspBuf));
+                } else {
+                    rspMsg->setLength(rspMsg->headLen());
+                }
+                response = std::move(rspMsg->encode());
+            }
             return rv;
         }
     }

@@ -40,7 +40,6 @@ namespace MF {
              */
             MyClient(uint16_t servantId) {
                 socket = new Socket::MySocket();
-                uid = static_cast<uint32_t >(socket->getfd() << 16 | servantId);
                 readBuffer = new Buffer::MySKBuffer(g_default_skbuffer_capacity);
             }
 
@@ -61,7 +60,7 @@ namespace MF {
                 }
 
                 if (readWatcher != nullptr) {
-                    delete(readWatcher);
+                    EV::MyWatcherManager::GetInstance()->destroy(readWatcher); //销毁read watcher
                 }
             }
 
@@ -71,6 +70,10 @@ namespace MF {
 
             const ClientConfig& getConfig() const {
                 return config;
+            }
+
+            uint32_t getFd() const {
+                return uid >> 16;
             }
 
             uint32_t getServantId() const {
@@ -147,11 +150,7 @@ namespace MF {
              * @param iobuf iobuf
              * @return 0 成功 其他 失败
              */
-            virtual int32_t sendPayload(const std::unique_ptr<Buffer::MyIOBuf>& iobuf) {
-                uint32_t length = iobuf->getReadableLength();
-                char* buf = static_cast<char*>(iobuf->readable());
-                return sendPayload(buf, length);
-            }
+            virtual int32_t sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) = 0;
 
             /**
              * 取出数据包
@@ -159,6 +158,13 @@ namespace MF {
              * @return 0 成功 other 失败
              */
             virtual std::unique_ptr<Buffer::MyIOBuf> fetchPayload( uint32_t length) = 0;
+
+            /**
+             * 当超时时需要做的事情
+             * @param pred pred
+             */
+            void whenTimeout(std::function<void()>&& pred, uint64_t requestId);
+
         protected:
 
             /**
@@ -201,6 +207,8 @@ namespace MF {
             int32_t onRead(char** buf, uint32_t* len) override;
 
             int32_t sendPayload(const char *buffer, uint32_t length) override;
+
+            int32_t sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) override;
 
             std::unique_ptr<Buffer::MyIOBuf> fetchPayload(uint32_t length) override;
 

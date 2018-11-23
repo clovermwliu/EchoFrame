@@ -23,6 +23,7 @@ namespace MF {
             std::string servantName; //servant name
             uint32_t asyncTimeout{3};  //asyncTimeout, 默认3秒超时
             std::vector<ClientConfig> clients; //client 配置
+            uint32_t handlerThreadCount{1}; //handler thread count
         };
 
         /**
@@ -221,7 +222,10 @@ namespace MF {
             magicMsg->setServerNumber(0); //TODO: 先设置为0
 
             //5. 编码数据包
-            request->setRequest(std::move(message));
+            magicMsg->setPayload(std::move(payload));
+
+            //6. 保存数据包
+            request->setRequest(std::move(magicMsg));
 
             return request; //返回request
         }

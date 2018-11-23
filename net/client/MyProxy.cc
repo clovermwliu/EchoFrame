@@ -17,6 +17,7 @@ namespace MF {
 
         void MyProxy::update(const MF::Client::ProxyConfig &config) {
             this->config = config;
+            handlerExecutor = new MyThreadExecutor<int32_t >(this->config.handlerThreadCount);
         }
 
         int32_t MyProxy::addTcpClient(const MF::Client::ClientConfig &config) {
@@ -54,7 +55,7 @@ namespace MF {
 
                 //构造read watcher
                 auto readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
-                        std::bind(&MyProxy::onRead, self.get(), std::placeholders::_1), client->getUid(), EV_READ);
+                        std::bind(&MyProxy::onRead, self.get(), std::placeholders::_1), client->getFd(), EV_READ);
 
                 //设置uid
                 readWatcher->setUid(client->getUid());
@@ -81,7 +82,7 @@ namespace MF {
         std::shared_ptr<MyClient> MyProxy::getClient() {
             //使用获取第一个client，并且在获取到之后将client保存到最后
             std::shared_ptr<MyClient> client = nullptr;
-            while(clients.empty()) {
+            while(!clients.empty()) {
                 std::weak_ptr<MyClient> c;
                 if (!clients.popFront(c)) {
                     continue;
@@ -111,7 +112,13 @@ namespace MF {
             uint32_t len = 0;
             int32_t rv = client->onRead(&buf, &len);
             if (rv < 0) {
-                LOG(ERROR) << "read error, uid:" << uid << std::endl;
+                if (errno != EAGAIN) {
+                    LOG(ERROR) << "read error, uid:" << uid << std::endl;
+                    loops->removeClient(client);
+                }
+                return; //返回
+            } else if (rv == 0) {
+                LOG(INFO) << "connection closed by remote, uid: " << uid << std::endl;
                 loops->removeClient(client);
                 return;
             }
@@ -120,6 +127,7 @@ namespace MF {
             auto status = isPacketComplete(buf, len);
             if (status == kPacketStatusIncomplete) {
                 //数据包不完整直接退出
+                LOG(INFO) << "receive packet incomplete, uid: " << uid << ", length: " << len << std::endl;
             } else if(status == kPacketStatusError) {
                 //数据包出错
                 LOG(ERROR) << "receive error packet, uid: " << uid <<", close connection" << std::endl;

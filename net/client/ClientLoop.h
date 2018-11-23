@@ -61,6 +61,9 @@ namespace MF{
             void removeClient(std::shared_ptr<MyClient> client);
 
         protected:
+            void onIdle() override;
+
+        protected:
             //map<servantName, proxy>
             std::map<uint32_t , std::shared_ptr<MyClient>> clients; //所有的proxy
         };

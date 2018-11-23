@@ -77,7 +77,7 @@ namespace MF {
             }
 
             uint32_t length(uint32_t bodyLen) const {
-                return headLength() + 1 + bodyLen + 2;
+                return headLength() + 1 + bodyLen;
             }
         protected:
             BODY msg;

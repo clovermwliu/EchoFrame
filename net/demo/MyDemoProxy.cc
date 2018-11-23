@@ -15,11 +15,11 @@ namespace MF {
         }
 
         int32_t MyDemoProxy::isPacketComplete(const char *buf, uint32_t len) {
-            return std::string(buf, len).find("\r\n") > 0 ? kPacketStatusComplete : kPacketStatusIncomplete;
+            return Protocol::MyMagicMessage::isPacketComplete(buf, len);
         }
 
         uint32_t MyDemoProxy::getPacketLength(const char *buf, uint32_t len) {
-            return static_cast<uint32_t >(std::string(buf, len).find("\r\n")) + 2;
+            return Protocol::MyMagicMessage::getPacketLength(buf, len);
         }
 
         unique_ptr<Protocol::MyMessage> MyDemoProxy::decode(const std::unique_ptr<Buffer::MyIOBuf> &iobuf) {
@@ -32,7 +32,7 @@ namespace MF {
 
             //解析body
             char* buf = static_cast<char*>(iobuf->readable()) + message->headLength() + 1; //去掉空格
-            uint32_t bodyLen = iobuf->getReadableLength() - message->headLength() - 2 - 1; //去掉\r\n两个分隔符和空格
+            uint32_t bodyLen = iobuf->getReadableLength() - message->headLength() - 1; //去掉\r\n两个分隔符和空格
             message->setMsg(std::string(buf, bodyLen));
 
             return message;
@@ -54,9 +54,6 @@ namespace MF {
             iobuf->write<char*>(
                     const_cast<char*>(message->getMsg().c_str())
                     , static_cast<uint32_t >(message->getMsg().size()));
-
-            //编码分隔符
-            iobuf->write<char*>(const_cast<char*>("\r\n"), 2);
 
             return std::move(iobuf);
         }

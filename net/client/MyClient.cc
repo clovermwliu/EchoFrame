@@ -38,8 +38,24 @@ namespace MF {
             return connectTime;
         }
 
+        void MyClient::whenTimeout(std::function<void()> &&pred, uint64_t requestId) {
+            auto self = std::weak_ptr<MyClient>(shared_from_this());
+            auto func = [pred, requestId, self] (EV::MyTimerWatcher*) {
+                pred(); //执行代码
+                //删除request
+                auto s = self.lock();
+                if (s != nullptr) {
+                    s->removeRequest(requestId);
+                }
+            };
+
+            loop->RunInThreadAfterDelay(func, config.timeout);
+        }
+
+
         MyTcpClient::MyTcpClient(uint16_t servantId) : MyClient(servantId){
             socket->socket(PF_INET, SOCK_STREAM, 0);
+            uid = static_cast<uint32_t >(socket->getfd() << 16 | servantId);
         }
 
         int32_t MyTcpClient::connect(const ClientConfig &config, ClientLoop* loop) {
@@ -103,7 +119,6 @@ namespace MF {
             int32_t err = socket->getConnectResult();
             if (err == 0) {
                 LOG(INFO) << "connect success, host: " << config.host << ", port: " << config.port << std::endl;
-                socket->setBlock();
             } else {
                 LOG(ERROR) << "connect fail, host: " << config.host << ", port: " << config.port << std::endl;
             }
@@ -119,14 +134,27 @@ namespace MF {
             if (!socket->connected()) {
                 return 0;
             }
-
             *len = 1024;
             *buf = readBuffer->writeable(*len);
             auto rv = socket->read(*buf, *len);
-            if (rv < 0 && errno == EAGAIN) {
-                rv = 0;
+            if (rv > 0) {
+                *len = static_cast<uint32_t >(rv);
+                readBuffer->moveWriteable(*len);
             }
             return rv;
+        }
+
+        int32_t MyTcpClient::sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) {
+            auto self = shared_from_this();
+            auto ptr = iobuf.release();
+            loop->RunInThread([self, ptr]() -> void {
+                std::unique_ptr<Buffer::MyIOBuf> tmpBuf(ptr);
+                auto buffer = tmpBuf->readable();
+                auto length = tmpBuf->getReadableLength();
+                self->getSocket()->write(buffer, length);
+            });
+
+            return 0;
         }
     }
 }

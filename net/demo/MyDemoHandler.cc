@@ -15,6 +15,8 @@ namespace MF {
             //回复响应
             rsp = "Your name is " + req ;
 
+            std::this_thread::sleep_for(std::chrono::seconds(4));
+
             return kHandleResultSuccess;
         }
 
@@ -27,7 +29,7 @@ namespace MF {
 
             //解析body
             char* buf = static_cast<char*>(msg->readable()) + message->headLength() + 1; //去掉空格
-            uint32_t bodyLen = msg->getReadableLength() - message->headLength() - 2 - 1; //去掉\r\n两个分隔符和空格
+            uint32_t bodyLen = msg->getReadableLength() - message->headLength() - 1; //去掉\r\n两个分隔符和空格
             message->setMsg(std::string(buf, bodyLen));
 
             return std::unique_ptr<MyDemoMessage<std::string> >(message);
@@ -50,9 +52,6 @@ namespace MF {
                     const_cast<char*>(message->getMsg().c_str())
                     , static_cast<uint32_t >(message->getMsg().size()));
 
-            //编码分隔符
-            iobuf->write<char*>(const_cast<char*>("\r\n"), 2);
-
             return std::move(iobuf);
         }
 
@@ -74,7 +73,7 @@ namespace MF {
 
             //解析body
             char* buf = static_cast<char*>(msg->readable()) + message->headLength() + 1; //去掉空格
-            uint32_t bodyLen = msg->getReadableLength() - message->headLength() - 2 - 1; //去掉\r\n两个分隔符和空格
+            uint32_t bodyLen = msg->getReadableLength() - message->headLength() - 1; //去掉\r\n两个分隔符和空格
             message->setMsg(std::string(buf, bodyLen));
 
             return std::unique_ptr<MyDemoMessage<std::string> > (message);
@@ -96,9 +95,6 @@ namespace MF {
             iobuf->write<char*>(
                     const_cast<char*>(message->getMsg().c_str())
                     , static_cast<uint32_t >(message->getMsg().size()));
-
-            //编码分隔符
-            iobuf->write<char*>(const_cast<char*>("\r\n"), 2);
 
             return std::move(iobuf);
         }

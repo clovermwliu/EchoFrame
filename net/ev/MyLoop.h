@@ -59,7 +59,8 @@ namespace MF {
                 queue_watcher_ = MyWatcherManager::GetInstance()->create<MyAsyncWatcher>(std::move(func));
                 add(queue_watcher_);
                 
-                idle_watcher_ = MyWatcherManager::GetInstance()->create<MyIdleWatcher>([] (MyWatcher*) {
+                idle_watcher_ = MyWatcherManager::GetInstance()->create<MyIdleWatcher>([this] (MyWatcher*) {
+                    this->onIdle(); //执行空闲任务
                     std::this_thread::sleep_for(std::chrono::milliseconds(10)); //休眠10毫秒
                 });
                 add(idle_watcher_);
@@ -205,6 +206,12 @@ namespace MF {
                 add(MyWatcherManager::GetInstance()->create<MyTimerWatcher>(
                         std::move(std::bind(func, std::placeholders::_1, args...)), delay, repeat));
             }
+
+        protected:
+            /**
+             * 当前线程空闲
+             */
+            virtual void onIdle() {}
 
         protected:
             MyLoop(MyLoop& r) = delete; //不允许拷贝

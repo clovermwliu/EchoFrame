@@ -60,8 +60,11 @@ namespace MF {
         public:
 
             //Session中需要记录的参数
-            using Action = std::function<int32_t (
+            using SuccessAction = std::function<int32_t (
                     const std::unique_ptr<RSP>&, const std::shared_ptr<MyRequest<REQ,RSP>>&)>;
+
+            using FailAction = std::function<int32_t (
+                    const std::shared_ptr<MyRequest<REQ,RSP>>&)>;
 
             MyRequest(std::weak_ptr<MyClient> client);
 
@@ -76,6 +79,7 @@ namespace MF {
             template<typename Pred, typename... Args>
             MyRequest<REQ, RSP>& then(Pred&& pred, Args... args) {
                 this->thenAction = std::bind(pred, std::placeholders::_1, std::placeholders::_2, args...);
+                return *this;
             }
 
             /**
@@ -86,7 +90,8 @@ namespace MF {
              */
             template<typename Pred, typename... Args>
             MyRequest<REQ, RSP>& timeout(Pred&& pred, Args... args) {
-                this->timeoutAction = std::bind(pred, std::placeholders::_1, std::placeholders::_2, args...);
+                this->timeoutAction = std::bind(pred, std::placeholders::_1, args...);
+                return *this;
             }
 
             /**
@@ -97,7 +102,8 @@ namespace MF {
              */
             template<typename Pred, typename... Args>
             MyRequest<REQ, RSP>& error(Pred&& pred, Args... args) {
-                this->errorAction = std::bind(pred, std::placeholders::_1, std::placeholders::_2, args...);
+                this->errorAction = std::bind(pred, std::placeholders::_1, args...);
+                return *this;
             }
 
             /**
@@ -112,33 +118,10 @@ namespace MF {
             std::unique_ptr<RSP> executeAndWait();
 
             /**
-             * 获取成功回调
-             * @return
-             */
-            const Action &getThenAction() const {
-                return thenAction;
-            }
-
-            /**
-             * 获取超时回调
-             * @return
-             */
-            const Action &getTimeoutAction() const {
-                return timeoutAction;
-            }
-
-            /**
-             * 获取失败回调
-             */
-            const Action &getErrorAction() const {
-                return errorAction;
-            }
-
-            /**
              * 设置request
              * @param request request
              */
-            void setRequest(std::unique_ptr<REQ> request);
+            void setRequest(std::unique_ptr<Protocol::MyMagicMessage> request);
 
             void setTimeoutWatcher(EV::MyTimerWatcher *timeoutWatcher);
 
@@ -151,13 +134,13 @@ namespace MF {
             int32_t doErrorAction() override;
 
         private:
-            Action thenAction; //成功回调
-            Action timeoutAction; //超时回调
-            Action errorAction; //错误回调
+            SuccessAction thenAction; //成功回调
+            FailAction timeoutAction; //超时回调
+            FailAction errorAction; //错误回调
 
             std::weak_ptr<MyClient> client; //客户端指针
 
-            EV::MyTimerWatcher* timeoutWatcher; //超时watcher
+            EV::MyTimerWatcher* timeoutWatcher {nullptr}; //超时watcher
 
             std::unique_ptr<Protocol::MyMagicMessage> request; //请求内容, 包含头信息
 
@@ -173,7 +156,7 @@ namespace MF {
             this->client = client;
             auto c = this->client.lock();
             if (c != nullptr) {
-                this->requestId = (static_cast<uint64_t >(c->getUid()) << 32) | MyTimeProvider::nowms();
+                this->requestId = (static_cast<uint64_t >(c->getUid()) << 32) | MyTimeProvider::now();
             }
         }
 
@@ -182,13 +165,26 @@ namespace MF {
             auto c = client.lock();
             if (c == nullptr) {
                 LOG(ERROR) << "connection closed" << std::endl;
+                return ;
+            }
+            auto r = request->encode();
+            if(c->sendPayload(std::move(r)) != 0) {
+                LOG(ERROR) << "send request fail, uid: " << c->getUid()
+                           << ", requestId: " << getRequestId() << std::endl;
                 return;
             }
-            if(c->sendPayload(request) != 0) {
-                LOG(ERROR) << "send request fail, uid: " << c->getUid() << std::endl;
-            } else {
-                LOG(INFO) << "send request success, uid: " << c->getUid() << std::endl;
-            }
+
+            LOG(INFO) << "send request success, uid: " << c->getUid()
+                      << ", requestId: " << getRequestId() << std::endl;
+
+            //增加定时器用于检查是否超时
+            auto self = std::weak_ptr<MyBaseRequest>(shared_from_this());
+            c->whenTimeout(std::bind([self]() -> void {
+                auto s = std::dynamic_pointer_cast<MyRequest<REQ,RSP>>(self.lock());
+                if (s != nullptr) {
+                    s->doTimeoutAction();
+                }
+            }), this->requestId);
         }
 
         template <typename REQ, typename RSP>
@@ -201,10 +197,12 @@ namespace MF {
                 return nullptr;
             }
             auto r = request->encode();
-            if(c->sendPayload(r) != 0) {
-                LOG(ERROR) << "send request fail, uid: " << c->getUid() << std::endl;
+            if(c->sendPayload(std::move(r)) != 0) {
+                LOG(ERROR) << "send request fail, uid: " << c->getUid()
+                        << ", requestId: " << getRequestId() << std::endl;
             } else {
-                LOG(INFO) << "send request success, uid: " << c->getUid() << std::endl;
+                LOG(INFO) << "send request success, uid: " << c->getUid()
+                        << ", requestId: " << getRequestId() << std::endl;
             }
 
             //生成future
@@ -247,8 +245,8 @@ namespace MF {
         }
 
         template<typename REQ, typename RSP>
-        void MyRequest<REQ, RSP>::setRequest(std::unique_ptr<REQ> request) {
-            request = std::move(request);
+        void MyRequest<REQ, RSP>::setRequest(std::unique_ptr<Protocol::MyMagicMessage> request) {
+            this->request = std::move(request);
         }
 
         template<typename REQ, typename RSP>
@@ -276,7 +274,7 @@ namespace MF {
                 //异步
                 if (timeoutAction) {
                     auto self = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(shared_from_this());
-                    rv = timeoutAction(nullptr, self);
+                    rv = timeoutAction(self);
                 }
             } else {
                 //同步, 发送通知
@@ -293,7 +291,7 @@ namespace MF {
                 //异步
                 if (errorAction) {
                     auto self = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(shared_from_this());
-                    rv = errorAction(nullptr, self);
+                    rv = errorAction(self);
                 }
             } else {
                 //同步, 发送通知

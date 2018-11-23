@@ -5,44 +5,48 @@
 #include "net/client/ClientLoop.h"
 namespace MF {
     namespace Client{
-       ClientLoop::ClientLoop(uint32_t flags) : MyLoop(flags){
+        ClientLoop::ClientLoop(uint32_t flags) : MyLoop(flags){
 
-       }
+        }
 
-       ClientLoop::~ClientLoop() {
-           clients.clear();
-       }
+        ClientLoop::~ClientLoop() {
+            clients.clear();
+        }
 
-       void ClientLoop::addClient(std::shared_ptr<MF::Client::MyClient> client) {
-           clients[client->getUid()] = client;
-       }
+        void ClientLoop::addClient(std::shared_ptr<MF::Client::MyClient> client) {
+            clients[client->getUid()] = client;
+        }
 
-       std::shared_ptr<MyClient> ClientLoop::findClient(uint32_t uid) {
-           return clients.find(uid) != clients.end() ? clients[uid] : nullptr;
-       }
+        std::shared_ptr<MyClient> ClientLoop::findClient(uint32_t uid) {
+            return clients.find(uid) != clients.end() ? clients[uid] : nullptr;
+        }
 
-       std::shared_ptr<MyClient> ClientLoop::findClient(const std::string &host, uint16_t port) {
-           std::shared_ptr<MyClient> client = nullptr;
-           for (auto it = clients.begin(); it != clients.end(); ++it) {
-               auto c = it->second->getConfig();
-               if (c.host == host && c.port == port) {
-                   client = it->second;
-                   break;
-               }
-           }
+        std::shared_ptr<MyClient> ClientLoop::findClient(const std::string &host, uint16_t port) {
+            std::shared_ptr<MyClient> client = nullptr;
+            for (auto it = clients.begin(); it != clients.end(); ++it) {
+                auto c = it->second->getConfig();
+                if (c.host == host && c.port == port) {
+                    client = it->second;
+                    break;
+                }
+            }
 
-           return client;
-       }
+            return client;
+        }
 
-       const std::map<uint32_t , std::shared_ptr<MyClient>>& ClientLoop::getClientMap() const {
-           return clients;
-       }
+        const std::map<uint32_t , std::shared_ptr<MyClient>>& ClientLoop::getClientMap() const {
+            return clients;
+        }
 
-       void ClientLoop::removeClient(std::shared_ptr<MF::Client::MyClient> client) {
-           clients.erase(client->getUid());
-       }
+        void ClientLoop::removeClient(std::shared_ptr<MF::Client::MyClient> client) {
+            clients.erase(client->getUid());
+        }
 
-       ClientLoopManager::~ClientLoopManager() {
+        void ClientLoop::onIdle() {
+            //检查是否有链接断开了
+        }
+
+        ClientLoopManager::~ClientLoopManager() {
            for (auto it = loops_.begin(); it != loops_.end(); ++it) {
                (*it)->stop();
            }
