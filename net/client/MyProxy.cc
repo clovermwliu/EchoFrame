@@ -130,14 +130,14 @@ namespace MF {
                     uint32_t packetLength = getPacketLength(buf, len);
                     if (packetLength <= 0) {
                         LOG(ERROR) << "packet length is invalid, uid: " << client->getUid() << ", close connection" << std::endl;
-                        return;
+                        break;
                     }
 
                     //获取完整数据包
                     std::unique_ptr<Buffer::MyIOBuf> iobuf = std::move(client->fetchPayload(packetLength));
                     if (iobuf == nullptr) {
                         LOG(ERROR) << "fetch packet fail, uid: " << client->getUid() << ", close connection" << std::endl;
-                        return;
+                        break;
                     }
 
                     //处理数据
