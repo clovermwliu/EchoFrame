@@ -15,6 +15,12 @@ namespace MF {
 
     namespace Client {
 
+        class MyClient;
+
+        using OnConnectFunction = std::function<void (std::shared_ptr<MyClient>)>; //连接成功需要进行的操作
+
+        using ReadFunction = std::function<void (EV::MyWatcher*)>; //有数据可读
+
         class ClientLoop; //client loop
 
         class MyBaseRequest; //request
@@ -30,8 +36,8 @@ namespace MF {
             std::string host;
             uint16_t port{0};
             uint32_t timeout{3};
-
-            int32_t clientType{kClientTypeTcp};
+            int32_t clientType{kClientTypeTcp}; //连接类型
+            bool autoReconnect{true}; //自动重连
         };
         class MyClient : public std::enable_shared_from_this<MyClient>{
         public:
@@ -47,20 +53,12 @@ namespace MF {
              * 析构函数
              */
             virtual ~MyClient() {
-                if (socket != nullptr) {
-                    delete(socket);
-                }
-
                 if (connectWatcher != nullptr) {
                     EV::MyWatcherManager::GetInstance()->destroy(connectWatcher); //销毁read watcher
                 }
 
                 if (readBuffer != nullptr) {
                     delete(readBuffer);
-                }
-
-                if (readWatcher != nullptr) {
-                    EV::MyWatcherManager::GetInstance()->destroy(readWatcher); //销毁read watcher
                 }
             }
 
@@ -73,7 +71,7 @@ namespace MF {
             }
 
             uint32_t getFd() const {
-                return uid >> 16;
+                return static_cast<uint32_t >(socket->getfd());
             }
 
             uint32_t getServantId() const {
@@ -97,6 +95,10 @@ namespace MF {
             }
 
             uint32_t getConnectTime() const;
+
+            bool connected() const {
+                return socket->connected();
+            }
 
             /**
              * 新增request
@@ -125,17 +127,45 @@ namespace MF {
             virtual int32_t connect(const ClientConfig& config, ClientLoop* loop) = 0;
 
             /**
+             * 断开连接
+             */
+            virtual void disconnect() = 0;
+
+            /**
+             * 重新链接
+             */
+            virtual std::future<int32_t > reconnect() = 0;
+
+            /**
              * 异步connect
              * @param config config
              * @return 返回数据
              */
-            virtual std::future<int32_t > asyncConnect(const ClientConfig& config, ClientLoop* loop) = 0;
+            virtual std::future<int32_t > asyncConnect(
+                    const ClientConfig& config, ClientLoop* loop, OnConnectFunction && func) = 0;
 
             /**
              * 有数据可以读
              * @return 读取结果
              */
-            virtual int32_t onRead(char** buf, uint32_t* len) = 0;
+            virtual int32_t onRead() = 0;
+
+            /**
+             * 获取可读数据的长度
+             * @return 可读数据长度
+             */
+            uint32_t getReadableLength() const {
+                return readBuffer->getReadableLength();
+            }
+
+            /**
+             * 获取可读数据的指针
+             * @param len 需要读取的长度, 并且返回可读的长度
+             * @return 指针
+             */
+            char* getReadableBuffer(uint32_t* len) const {
+                return readBuffer->readable(len);
+            }
 
             /**
              * 发送数据包
@@ -163,8 +193,7 @@ namespace MF {
              * 当超时时需要做的事情
              * @param pred pred
              */
-            void whenTimeout(std::function<void()>&& pred, uint64_t requestId);
-
+            void whenRequestTimeout(std::function<void()> &&pred, uint64_t requestId);
         protected:
 
             /**
@@ -177,7 +206,7 @@ namespace MF {
             uint32_t uid{0}; //uid
 
             Socket::MySocket* socket{nullptr}; //socket
-            std::promise<int32_t > connectPromise; //connect promise
+            std::promise<int32_t >* connectPromise; //connect promise
             EV::MyIOWatcher* connectWatcher{nullptr}; //connect watcher
             EV::MyIOWatcher* readWatcher{nullptr}; //read watcher
 
@@ -191,6 +220,10 @@ namespace MF {
             std::map<uint64_t ,std::shared_ptr<MyBaseRequest>> requests;// 已经发出的所有request
 
             uint32_t connectTime; //连接开始的时间
+
+            OnConnectFunction onConnectFunc; //连接成功需要执行的方法
+
+            ReadFunction rf; //有数据可读需要执行的东西
         };
 
         /**
@@ -200,11 +233,18 @@ namespace MF {
         public:
             MyTcpClient(uint16_t servantId);
 
+            virtual ~MyTcpClient();
+
             int32_t connect(const ClientConfig &config, ClientLoop* loop) override;
 
-            std::future<int32_t> asyncConnect(const ClientConfig &config, ClientLoop* loop) override;
+            void disconnect() override;
 
-            int32_t onRead(char** buf, uint32_t* len) override;
+            std::future<int32_t > reconnect() override;
+
+            std::future<int32_t> asyncConnect(
+                    const ClientConfig &config, ClientLoop* loop, OnConnectFunction && csf) override;
+
+            int32_t onRead() override;
 
             int32_t sendPayload(const char *buffer, uint32_t length) override;
 

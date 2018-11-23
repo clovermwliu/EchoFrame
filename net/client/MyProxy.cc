@@ -23,56 +23,36 @@ namespace MF {
         int32_t MyProxy::addTcpClient(const MF::Client::ClientConfig &config) {
             //1. 构造client
             auto client = std::make_shared<MyTcpClient>(hash(getServantName()) % 0xFFF);
+            //保存client
+            loops->addClient(client);
 
             //2. 连接
             auto loop = loops->getByServantId(client->getServantId());
-            auto future = client->asyncConnect(config, loop).share();
             auto self = shared_from_this();
-            loop->RunInThreadAfterDelayAndRepeat([self, client, future, config] (EV::MyTimerWatcher* watcher) -> void {
-                //检查是否超时
-                if (MyTimeProvider::now() - client->getConnectTime() >= config.timeout) {
-                    LOG(ERROR) << "connect timeout, host: " << config.host << ", port:" << config.port << std::endl;
-                    //关闭watcher
-                    EV::MyWatcherManager::GetInstance()->destroy(watcher);
-                    return;
+            auto future = client->asyncConnect(config, loop, [self] (std::shared_ptr<MyClient> client) {
+                if (client->connected()) {
+                    //构造read watcher
+                    auto readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
+                            std::bind(&MyProxy::onRead, self.get(), std::placeholders::_1), client->getFd(), EV_READ);
+                    //设置uid
+                    readWatcher->setUid(client->getUid());
+
+                    //watcher保存到事件循环
+                    client->getLoop()->add(readWatcher);
+                    client->setReadWatcher(readWatcher); //保存readwatcher
+                    self->clients.pushBack(std::weak_ptr<MyClient>(client));
+                } else {
+                    //连接失败，那么就10秒后再试一次
+                    if (client->getConfig().autoReconnect) {
+                        client->getLoop()->RunInThreadAfterDelay([client] (EV::MyTimerWatcher*) -> void {
+                            client->reconnect();
+                        }, self->config.reconnectInterval);
+                    }
                 }
-                //检查是否已经ready
-                if(future.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-                    return;
-                }
-                //promise返回了
-                auto rv = future.get();
-                if (rv != 0) { //链接失败
-                    LOG(INFO) << "tcp client connect success, host: "
-                              << config.host << ", port: " << config.port
-                              << std::endl;
-                    return;
-                }
+            });
 
-                //connect 成功
-                LOG(INFO) << "tcp client connect success, host: "
-                          << config.host << ", port: " << config.port << std::endl;
-
-                //构造read watcher
-                auto readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
-                        std::bind(&MyProxy::onRead, self.get(), std::placeholders::_1), client->getFd(), EV_READ);
-
-                //设置uid
-                readWatcher->setUid(client->getUid());
-
-                //watcher保存到事件循环
-                client->getLoop()->add(readWatcher);
-                client->setReadWatcher(readWatcher); //保存readwatcher
-
-                //保存client
-                self->loops->addClient(client);
-                self->clients.pushBack(std::weak_ptr<MyClient>(client));
-
-                //关闭定时器
-                EV::MyWatcherManager::GetInstance()->destroy(watcher);
-            }, 1, 1);
-
-            return 0;
+            return future.wait_for(std::chrono::seconds(0))
+                    == std::future_status::ready ? future.get() : 0;
         }
 
         int32_t MyProxy::addUdpClient(const MF::Client::ClientConfig &config) {
@@ -108,49 +88,81 @@ namespace MF {
                 return;
             }
 
-            char* buf = nullptr;
-            uint32_t len = 0;
-            int32_t rv = client->onRead(&buf, &len);
+            int32_t rv = client->onRead();
             if (rv < 0) {
                 if (errno != EAGAIN) {
                     LOG(ERROR) << "read error, uid:" << uid << std::endl;
-                    loops->removeClient(client);
+                    onDisconnect(client);
+                    return;
                 }
-                return; //返回
             } else if (rv == 0) {
                 LOG(INFO) << "connection closed by remote, uid: " << uid << std::endl;
+                onDisconnect(client);
+                return;
+            }
+
+            //3. 循环获取所有的数据
+            int32_t status = kPacketStatusIncomplete;
+            do {
+                //获取可读数据的长度
+                uint32_t len = client->getReadableLength();
+                if (len <= 0) {
+                    break; //所有数据都读完了
+                }
+
+                //获取数据
+                char* buf = client->getReadableBuffer(&len);
+                if (buf == nullptr || len == 0) {
+                    break; //所有数据都读完了
+                }
+
+                //4. 处理读到的数据
+                status = isPacketComplete(buf, len);
+                if (status == kPacketStatusIncomplete) {
+                    //数据包不完整直接退出
+                    LOG(INFO) << "receive packet incomplete, uid: " << client->getUid() << ", length: " << len << std::endl;
+                } else if(status == kPacketStatusError) {
+                    //数据包出错
+                    LOG(ERROR) << "receive error packet, uid: " << client->getUid() <<", close connection" << std::endl;
+                    onDisconnect(client);
+                } else {
+                    //数据包完整了，获取数据包长度
+                    uint32_t packetLength = getPacketLength(buf, len);
+                    if (packetLength <= 0) {
+                        LOG(ERROR) << "packet length is invalid, uid: " << client->getUid() << ", close connection" << std::endl;
+                        return;
+                    }
+
+                    //获取完整数据包
+                    std::unique_ptr<Buffer::MyIOBuf> iobuf = std::move(client->fetchPayload(packetLength));
+                    if (iobuf == nullptr) {
+                        LOG(ERROR) << "fetch packet fail, uid: " << client->getUid() << ", close connection" << std::endl;
+                        return;
+                    }
+
+                    //处理数据
+                    auto obuf = iobuf.release();
+                    handlePacket(std::unique_ptr<Buffer::MyIOBuf>(obuf));
+                }
+            }while (status == kPacketStatusComplete);
+
+        }
+
+        void MyProxy::onDisconnect(const std::shared_ptr<MyClient>& client) {
+
+            //不需要自动重连
+            if (!client->getConfig().autoReconnect) {
                 loops->removeClient(client);
                 return;
             }
 
-            //4. 处理读到的数据
-            auto status = isPacketComplete(buf, len);
-            if (status == kPacketStatusIncomplete) {
-                //数据包不完整直接退出
-                LOG(INFO) << "receive packet incomplete, uid: " << uid << ", length: " << len << std::endl;
-            } else if(status == kPacketStatusError) {
-                //数据包出错
-                LOG(ERROR) << "receive error packet, uid: " << uid <<", close connection" << std::endl;
-                loops->removeClient(client);
-            } else {
-                //数据包完整了，获取数据包长度
-                uint32_t packetLength = getPacketLength(buf, len);
-                if (packetLength <= 0) {
-                    LOG(ERROR) << "packet length is invalid, uid: " << uid << ", close connection" << std::endl;
-                    return;
-                }
+            //x秒之后重连
+            auto self = shared_from_this();
+            client->disconnect(); //先断开链接
+            client->getLoop()->RunInThreadAfterDelay([client] (EV::MyTimerWatcher*) -> void {
+                client->reconnect();
+            }, self->config.reconnectInterval);
 
-                //获取完整数据包
-                std::unique_ptr<Buffer::MyIOBuf> iobuf = std::move(client->fetchPayload(packetLength));
-                if (iobuf == nullptr) {
-                    LOG(ERROR) << "fetch packet fail, uid: " << uid << ", close connection" << std::endl;
-                    return;
-                }
-
-                //处理数据
-                auto obuf = iobuf.release();
-                handlePacket(std::unique_ptr<Buffer::MyIOBuf>(obuf));
-            }
         }
 
         ServantProxy::ServantProxy(ClientLoopManager* loops)
@@ -252,6 +264,10 @@ namespace MF {
             MyProxy::update(config);
 
             this->initialize(this->config.clients);
+        }
+
+        void ServantProxy::handleMessage(const char* buf, uint32_t len, std::shared_ptr<MyClient> client) {
+
         }
     }
 }

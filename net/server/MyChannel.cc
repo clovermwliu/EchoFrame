@@ -113,29 +113,25 @@ namespace MF {
 
         MyTcpChannel::MyTcpChannel(Socket::MySocket *socket) : MyChannel(socket) {}
 
-        int32_t MyTcpChannel::onRead(char **buf, uint32_t *length) {
-            int32_t  result = -1;
-            //1. 从socket读取数据
-            uint32_t readLen = 1024; //每次读取1k
-            char* tmp = readBuf->writeable(readLen);
-            int32_t rv = socket->read(tmp, readLen);
-            if (rv == 0) {
-                //对端已关闭
-            } else if (rv  < 0) {
-                //读取出错
-                result = errno == EAGAIN ? 0 : -1;
-            } else {
-                //读到了数据
-                result = 0;
-                readBuf->moveWriteable(static_cast<uint32_t >(rv));
+        int32_t MyTcpChannel::onRead() {
+            int32_t rv = 0;
+            uint32_t len = 1024;
+            while (true) {
+                char *buf = readBuf->writeable(len);
+                auto read = socket->read(buf, len);
+                if (read > 0) {
+                    readBuf->moveWriteable(static_cast<uint32_t >(read));
+                    rv += read;
+                } else if (read == 0) {
+                    rv = 0; //对端关闭了
+                    break;
+                } else {
+                    rv = -1; //读取失败了
+                    break;
+                }
             }
-
-            //获取可读数据
-            *length = readBuf->getReadableLength();
-            *buf = readBuf->readable(length);
-
             lastReceiveTime = MyTimeProvider::now(); //设置最后一次接收到消息的时间
-            return result;
+            return rv;
         }
 
         int32_t MyTcpChannel::onWrite() {

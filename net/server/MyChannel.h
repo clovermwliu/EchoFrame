@@ -39,7 +39,24 @@ namespace MF {
              * @param length 可读指针长度
              * @return 0 成功 -1 失败
              */
-            virtual int32_t onRead(char **buf, uint32_t *length) = 0;
+            virtual int32_t onRead() = 0;
+
+            /**
+             * 获取可读数据的长度
+             * @return 可读数据长度
+             */
+            uint32_t getReadableLength() const {
+                return readBuf->getReadableLength();
+            }
+
+            /**
+             * 获取可读数据的指针
+             * @param len 需要读取的长度, 并且返回可读的长度
+             * @return 指针
+             */
+            char* getReadableBuffer(uint32_t* len) const {
+                return readBuf->readable(len);
+            }
 
             /**
              * 有数据可以发送了
@@ -126,7 +143,7 @@ namespace MF {
         public:
             MyTcpChannel(Socket::MySocket *socket);
 
-            int32_t onRead(char **buf, uint32_t *length) override;
+            int32_t onRead() override;
 
             int32_t onWrite() override;
         };

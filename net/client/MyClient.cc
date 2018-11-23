@@ -38,7 +38,7 @@ namespace MF {
             return connectTime;
         }
 
-        void MyClient::whenTimeout(std::function<void()> &&pred, uint64_t requestId) {
+        void MyClient::whenRequestTimeout(std::function<void()> &&pred, uint64_t requestId) {
             auto self = std::weak_ptr<MyClient>(shared_from_this());
             auto func = [pred, requestId, self] (EV::MyTimerWatcher*) {
                 pred(); //执行代码
@@ -52,16 +52,19 @@ namespace MF {
             loop->RunInThreadAfterDelay(func, config.timeout);
         }
 
-
         MyTcpClient::MyTcpClient(uint16_t servantId) : MyClient(servantId){
             socket->socket(PF_INET, SOCK_STREAM, 0);
             uid = static_cast<uint32_t >(socket->getfd() << 16 | servantId);
         }
 
+        MyTcpClient::~MyTcpClient() {
+            disconnect();
+        }
+
         int32_t MyTcpClient::connect(const ClientConfig &config, ClientLoop* loop) {
             
             //调用异步接口
-            auto future = asyncConnect(config, loop);
+            auto future = asyncConnect(config, loop, nullptr);
             
             //等待任务完成
             if (future.wait_for(std::chrono::seconds(config.timeout)) != std::future_status::ready) {
@@ -73,16 +76,57 @@ namespace MF {
             return future.get();
         }
 
-        std::future<int32_t> MyTcpClient::asyncConnect(const ClientConfig &config, ClientLoop* loop) {
+        void MyTcpClient::disconnect() {
+            if (socket != nullptr) {
+                delete(socket);
+                socket = nullptr;
+            }
+
+            //停止readwatcher
+            if (readWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(readWatcher);
+                readWatcher = nullptr;
+            }
+
+            if (connectPromise != nullptr) {
+                delete(connectPromise);
+                connectPromise = nullptr;
+            }
+
+            if (readBuffer != nullptr) {
+                readBuffer->reset();
+            }
+        }
+
+        std::future<int32_t > MyTcpClient::reconnect() {
+            //1. 断开链接
+            disconnect();
+
+            //2. 重新链接
+            socket = new Socket::MySocket();
+            if (socket->socket(AF_INET, SOCK_STREAM, 0) != 0) {
+                LOG(ERROR) << "socket fail" << std::endl;
+                connectPromise->set_value(-1); //连接失败
+                return connectPromise->get_future();
+            }
+
+            //3. 连接
+            return asyncConnect(this->config, this->loop, std::move(this->onConnectFunc));
+        }
+
+        std::future<int32_t> MyTcpClient::asyncConnect(
+                const ClientConfig &config, ClientLoop* loop, OnConnectFunction && func) {
             this->config = config; //保存配置
             this->loop = loop; //保存loop
+            this->onConnectFunc = func; //连接成功需要执行的回调
+            this->connectPromise = new std::promise<int32_t >();
 
             //1. 连接
             socket->setNonBlock(); //设置异步
             if (socket->connect(config.host, config.port) != 0) {
                 LOG(ERROR) << "connect fail, host: " << config.host << ", port: " << config.port << std::endl;
-                connectPromise.set_value(-1);
-                return connectPromise.get_future();
+                connectPromise->set_value(-1);
+                return connectPromise->get_future();
             }
 
             //2. 构造read watcher
@@ -91,7 +135,7 @@ namespace MF {
 
             this->loop->add(connectWatcher);
             this->connectTime = MyTimeProvider::now();
-            return connectPromise.get_future();
+            return connectPromise->get_future();
         }
 
         int32_t MyTcpClient::sendPayload(const char *buffer, uint32_t length) {
@@ -114,33 +158,46 @@ namespace MF {
             if (socket->connected()) {
                 return;
             }
-
             //检查连接是否成功
             int32_t err = socket->getConnectResult();
             if (err == 0) {
                 LOG(INFO) << "connect success, host: " << config.host << ", port: " << config.port << std::endl;
+                socket->setConnected(); //设置已连接
             } else {
-                LOG(ERROR) << "connect fail, host: " << config.host << ", port: " << config.port << std::endl;
+                LOG(ERROR) << "connect fail, host: " << config.host << ", port: " << config.port
+                << ", error: " << strerror(err) << std::endl;
             }
-            connectPromise.set_value(err); //future返回结果
-
+            connectPromise->set_value(err); //future返回结果
             //关闭watcher
             EV::MyWatcherManager::GetInstance()->destroy(connectWatcher);
             connectWatcher = nullptr;
-            socket->setConnected(); //设置socket已连接
+            //回调
+            if (onConnectFunc) {
+                onConnectFunc(shared_from_this());
+            }
         }
 
-        int32_t MyTcpClient::onRead(char** buf, uint32_t* len) {
+        int32_t MyTcpClient::onRead() {
             if (!socket->connected()) {
-                return 0;
+                return -1;
             }
-            *len = 1024;
-            *buf = readBuffer->writeable(*len);
-            auto rv = socket->read(*buf, *len);
-            if (rv > 0) {
-                *len = static_cast<uint32_t >(rv);
-                readBuffer->moveWriteable(*len);
+            uint32_t len = 1024;
+            int32_t rv = 0;
+            while (true) {
+                char *buf = readBuffer->writeable(len);
+                auto read = socket->read(buf, len);
+                if (read > 0) {
+                    readBuffer->moveWriteable(static_cast<uint32_t >(read));
+                    rv += read;
+                } else if (read == 0) {
+                    rv = 0; //对端关闭了
+                    break;
+                } else {
+                    rv = -1; //读取失败了
+                    break;
+                }
             }
+
             return rv;
         }
 

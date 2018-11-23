@@ -95,33 +95,47 @@ namespace MF {
             }
 
             //4. 使用channel读取数据
-            char* buf = nullptr;
-            uint32_t len = 0;
-            if (channel->onRead(&buf, &len) < 0) {
+            auto rv = channel->onRead();
+            if (rv < 0) {
                 LOG(ERROR) << "read error, uid: " << uid << std::endl;
-                //读取失败，需要关闭channel
+                if (errno != EAGAIN) { //读取失败，并且不是数据读完，那么就关闭socket
+                    //读取失败，需要关闭channel
+                    onReadError(channel);
+                    return;
+                }
+            } else if (rv == 0) {
+                LOG(INFO) << "connection close by remote, uid: " << uid << std::endl;
                 onReadError(channel);
                 return;
             }
 
-            //5. 检查数据是否可用
-            if (buf == nullptr || len == 0) {
-                LOG(ERROR) << "read no data, uid: " << uid << std::endl;
-                return; //没有数据直接返回
-            }
+            //5. 处理所有的数据
+            int32_t status = kPacketStatusIncomplete;
+            do {
+                //获取可读数据的长度
+                uint32_t len = channel->getReadableLength();
+                if (len <= 0) {
+                    break; //所有数据都读完了
+                }
 
-            //6. 将数据交给dispatch
-            int32_t rv = dispatcher->isPacketComplete(buf, len);
-            if( rv == kPacketStatusIncomplete) {
-                //数据包不完整，那么就等待下一次数据
-                LOG(INFO) << "packet incomplete, uid: " << uid << ", length: " << len << std::endl;
-            } else if (rv == kPacketStatusError) {
-                //数据包出错了, 需std::move(要断开连接)
-                LOG(ERROR) << "packet error, uid: " << uid << ", length: " << len << std::endl;
-                onReadError(channel);
-            } else if (rv == kPacketStatusComplete) {
-                onReadComplete(channel, buf, len);
-            }
+                //获取数据
+                char* buf = channel->getReadableBuffer(&len);
+                if (buf == nullptr || len == 0) {
+                    break; //所有数据都读完了
+                }
+
+                status = dispatcher->isPacketComplete(buf, len);
+                if( status == kPacketStatusIncomplete) {
+                    //数据包不完整，那么就等待下一次数据
+                    LOG(INFO) << "packet incomplete, uid: " << uid << ", length: " << len << std::endl;
+                } else if (status == kPacketStatusError) {
+                    //数据包出错了, 需std::move(要断开连接)
+                    LOG(ERROR) << "packet error, uid: " << uid << ", length: " << len << std::endl;
+                    onReadError(channel);
+                } else if (status == kPacketStatusComplete) {
+                    onReadComplete(channel, buf, len);
+                }
+            } while(status == kPacketStatusComplete);
         }
 
         void MyTcpServant::onWrite(MF::EV::MyWatcher *watcher) {

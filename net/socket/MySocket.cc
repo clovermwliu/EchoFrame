@@ -65,9 +65,7 @@ namespace MF {
             
             if (rv != 0) { //如果出错了，则抛出异常
                 auto err = errno;
-                if (err == EINPROGRESS
-                    || err == EAGAIN
-                    || err == EALREADY) {
+                if (err == EINPROGRESS) {
                     isConnected = false;
                     rv = 0;
                 } else {
@@ -82,7 +80,7 @@ namespace MF {
 
         int32_t MySocket::getConnectResult() const {
             int32_t error = 0;
-            uint32_t len = 0;
+            uint32_t len = sizeof(error);
             getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len);
             return error;
         }

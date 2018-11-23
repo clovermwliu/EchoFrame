@@ -179,8 +179,8 @@ namespace MF {
 
             //增加定时器用于检查是否超时
             auto self = std::weak_ptr<MyBaseRequest>(shared_from_this());
-            c->whenTimeout(std::bind([self]() -> void {
-                auto s = std::dynamic_pointer_cast<MyRequest<REQ,RSP>>(self.lock());
+            c->whenRequestTimeout(std::bind([self]() -> void {
+                auto s = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(self.lock());
                 if (s != nullptr) {
                     s->doTimeoutAction();
                 }

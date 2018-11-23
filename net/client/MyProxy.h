@@ -22,6 +22,7 @@ namespace MF {
         struct ProxyConfig {
             std::string servantName; //servant name
             uint32_t asyncTimeout{3};  //asyncTimeout, 默认3秒超时
+            uint32_t reconnectInterval {10}; //重连间隔
             std::vector<ClientConfig> clients; //client 配置
             uint32_t handlerThreadCount{1}; //handler thread count
         };
@@ -89,6 +90,11 @@ namespace MF {
              * 有数据可读
              */
             virtual void onRead(EV::MyWatcher* watcher);
+
+            /**
+             * 客户端断连
+             */
+            virtual void onDisconnect(const std::shared_ptr<MyClient>& client);
 
             /**
              * 判断响应包数据是否完整
@@ -170,6 +176,9 @@ namespace MF {
              * @return buffer
              */
             virtual std::unique_ptr<Buffer::MyIOBuf> encode(const std::unique_ptr<Protocol::MyMessage>& message) = 0;
+
+        private:
+            void handleMessage(const char* buf, uint32_t len, std::shared_ptr<MyClient> client);
         };
 
         template<typename REQ, typename RSP>
