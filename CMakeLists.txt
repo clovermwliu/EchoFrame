@@ -68,5 +68,5 @@ link_directories(
 link_libraries(ev tinyxml2 glog)
 
 # 可执行程序列表
-add_executable(MyFramework2 ${SOURCE_FILES} ${SERVER_MAIN})
+add_executable(Server ${SOURCE_FILES} ${SERVER_MAIN})
 add_executable(Client ${SOURCE_FILES} client.cc ${CLIENT_MAIN})
