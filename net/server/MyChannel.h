@@ -84,7 +84,7 @@ namespace MF {
              * @param length  length
              * @return 发送的数据字节数
              */
-            uint32_t sendResponse(const char* buf, uint32_t length);
+            virtual uint32_t sendResponse(const char* buf, uint32_t length) = 0;
 
             /**
              * 设置read watcher
@@ -106,7 +106,7 @@ namespace MF {
              * 获取uid
              * @return uid
              */
-            uint32_t getUid() const {
+            uint64_t getUid() const {
                 return uid;
             }
 
@@ -117,7 +117,7 @@ namespace MF {
             uint64_t getLastReceiveTime() const;
 
         protected:
-            uint32_t  uid{0}; //连接的标识id
+            uint64_t uid{0}; //连接的标识id
 
             Socket::MySocket* socket{nullptr}; //socket
             EV::MyIOWatcher* readWatcher; //connectWatcher;
@@ -146,6 +146,28 @@ namespace MF {
             int32_t onRead() override;
 
             int32_t onWrite() override;
+
+            uint32_t sendResponse(const char *buf, uint32_t length) override;
+        };
+
+        /**
+         * udp channel
+         */
+        class MyUdpChannel : public MyChannel {
+        public:
+            MyUdpChannel(Socket::MySocket* socket, const std::string& ip, uint16_t port);
+
+            int32_t onRead() override;
+
+            int32_t onWrite() override;
+
+            static uint64_t createUid(const std::string& ip, uint16_t port);
+
+            uint32_t sendResponse(const char *buf, uint32_t length) override;
+
+        private:
+            std::string ip;
+            uint16_t port;
         };
     }
 }

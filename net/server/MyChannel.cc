@@ -62,19 +62,6 @@ namespace MF {
             return std::move(buf);
         }
 
-        uint32_t MyChannel::sendResponse(const char *buf, uint32_t length) {
-            std::lock_guard<std::mutex> guard(writeBufMutex); //尝试加锁
-            char* tmp = this->writeBuf->getWriteableAndMove(length);
-            if (tmp != nullptr) {
-                memcpy(tmp, buf, length); //拷贝数据
-
-                //发送可写请求
-                this->writeWatcher->signal();
-            }
-
-            return length;
-        }
-
         /**
          * 设置读数据watcher
          * @param readWatcher
@@ -152,6 +139,108 @@ namespace MF {
             //2. 移动指针
             writeBuf->moveReadable(len);
             return send >= len ? 0 : -1; //检查发送的字节数和可发送的字节数是否一致
+        }
+
+        uint32_t MyTcpChannel::sendResponse(const char *buf, uint32_t length) {
+            std::lock_guard<std::mutex> guard(writeBufMutex); //尝试加锁
+            char* tmp = this->writeBuf->getWriteableAndMove(length);
+            if (tmp != nullptr) {
+                memcpy(tmp, buf, length); //拷贝数据
+
+                //发送可写请求
+                this->writeWatcher->signal();
+            }
+            return length;
+        }
+
+        MyUdpChannel::MyUdpChannel(MF::Socket::MySocket *socket, const std::string& ip, uint16_t port)
+        : MyChannel(socket){
+            this->ip = ip;
+            this->port = port;
+
+            //重新生成uid
+            this->uid = createUid(ip, port);
+        }
+
+        int32_t MyUdpChannel::onRead() {
+            uint32_t len = g_max_udp_packet_length;
+            char* buf = this->readBuf->writeable(len);
+
+            //读取数据
+            sockaddr_in addr;
+            socklen_t addrLen = sizeof(addr);
+            bzero(&addr, addrLen);
+            int32_t readLen = this->socket->readFrom(reinterpret_cast<sockaddr*>(&addr), &addrLen, buf, len);
+            if (readLen <= 0) {
+                LOG(ERROR) << "read data fail, readLen: " << readLen << std::endl;
+                return -1;
+            }
+
+            //移动指针
+            readBuf->moveWriteable(static_cast<uint32_t >(static_cast<uint32_t >(readLen)));
+            lastReceiveTime = MyTimeProvider::now(); //设置最后一次接收到消息的时间
+            return readLen;
+        }
+
+        int32_t MyUdpChannel::onWrite() {
+            std::lock_guard<std::mutex> guard(writeBufMutex); //尝试加锁
+            int32_t rv = 0;
+            do {
+                //1. 获取可发送的长度
+                uint32_t len = this->writeBuf->getReadableLength();
+                uint32_t flagLen = sizeof(uint32_t);
+                //数据包长度不够，不做发送
+                if (len <= sizeof(uint32_t)) { //正常来说不会走进来
+                    break;
+                }
+
+                //2. 获取即将发送的数据包长度
+                char* buf = this->writeBuf->readable(&flagLen);
+                uint32_t flag = 0;
+                memcpy(&flag, buf, flagLen);
+                if (flag > len - flagLen) { //编码出错了
+                    rv = -1;
+                    break;
+                }
+                this->writeBuf->moveReadable(flagLen); //移动指针
+
+                //3. 发送数据
+                uint32_t send = 0;
+                buf = this->writeBuf->readable(&flag);
+                while(send < flag) {
+                    //需要确认多线程调用writeTo是否ok？
+                    int32_t sent = socket->writeTo(
+                            this->ip, this->port, static_cast<void*>(buf + send), flag - send);
+                    if (sent <= 0) {
+                        break;
+                    }
+
+                    send += sent; //保存已发送的数据长度
+            }
+
+                //2. 移动指针
+                writeBuf->moveReadable(flag);
+            } while(true);
+            return rv; //返回发送结果
+        }
+
+        uint64_t MyUdpChannel::createUid(const std::string &ip, uint16_t port) {
+            return static_cast<uint64_t > (std::hash<std::string>()(ip + ":" + MyCommon::tostr(port)));
+        }
+
+        uint32_t MyUdpChannel::sendResponse(const char *buf, uint32_t length) {
+            std::lock_guard<std::mutex> guard(writeBufMutex); //尝试加锁
+            //1. 开头的四个字节用于记录数据包长度
+            uint32_t flagLen = sizeof(length);
+            char* tmp = this->writeBuf->getWriteableAndMove(length + flagLen);
+            if (tmp != nullptr) {
+                memcpy(tmp, &length, flagLen);
+                memcpy(tmp + flagLen, buf, length); //拷贝数据
+
+                //发送可写请求
+                this->writeWatcher->signal();
+            }
+            return length;
         }
     }
 }

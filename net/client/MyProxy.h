@@ -150,18 +150,17 @@ namespace MF {
             void handlePacket(const std::unique_ptr<Buffer::MyIOBuf> &iobuf) override;
 
             /**
-             * 发送数据
-             */
-            template<typename REQ, typename RSP>
-            std::shared_ptr<MyRequest<REQ, RSP>> buildRequest(std::unique_ptr<REQ> message);
-
-            /**
              * 更新proxy
              * @param config config
              */
             void update(const ProxyConfig &config) override;
 
         protected:
+            /**
+             * 发送数据
+             */
+            template<typename REQ, typename RSP>
+            std::shared_ptr<MyRequest<REQ, RSP>> buildRequest(std::unique_ptr<REQ> message);
 
             /**
              * decode 消息

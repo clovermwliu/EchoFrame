@@ -44,6 +44,7 @@ int main(int argc, const char * argv[]) {
     clientConfig.host = "127.0.0.1";
     clientConfig.port = 8888;
     clientConfig.timeout = 3;
+    clientConfig.autoReconnect = true;
     std::vector<ClientConfig> clientConfigs;
     clientConfigs.push_back(clientConfig);
     MyCommunicator::GetInstance()->update(servantName, clientConfigs);
@@ -61,18 +62,13 @@ int main(int argc, const char * argv[]) {
             std::string cmd = line.substr(0, line.find(' '));
             std::string msg = line.substr(line.find(' ') + 1);
 
-            auto req = std::move(std::unique_ptr<MyDemoMessage<std::string>>(
-                    new MyDemoMessage<std::string>(cmd, msg)));
-            proxy
-            ->buildRequest<MyDemoMessage<std::string>, MyDemoMessage<std::string>>(std::move(req))
-            ->then([] (const DemoMsg& rsp, const DemoContext& context)
-            -> int32_t {
-                LOG(INFO) << "receive response: " << rsp->getCmd() << " " << rsp->getMsg() << std::endl;
-            })
-            .timeout([] (const DemoContext& context) -> int32_t {
-                LOG(INFO) << "request timeout" << std::endl;
-            })
-            .execute();
+            if (cmd == "username") {
+                LOG(INFO) << proxy->setUsername(msg) << std::endl;
+            } else if (cmd == "password") {
+                LOG(INFO) << proxy->setPassword(msg) << std::endl;
+            } else if (cmd == "quit") {
+                proxy->quit();
+            }
         }
     }
 

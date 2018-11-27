@@ -17,7 +17,6 @@ namespace MF {
 
         void MyProxy::update(const MF::Client::ProxyConfig &config) {
             this->config = config;
-            handlerExecutor = new MyThreadExecutor<int32_t >(this->config.handlerThreadCount);
         }
 
         int32_t MyProxy::addTcpClient(const MF::Client::ClientConfig &config) {

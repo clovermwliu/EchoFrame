@@ -14,7 +14,6 @@
 
 #include "net/server/MyServer.h"
 #include "net/demo/MyDemoDispatcher.h"
-#include "net/demo/MyDemoCodec.h"
 
 
 using namespace MF::EV;
@@ -41,8 +40,8 @@ int main(int argc, const char * argv[]) {
     servantConfig.name = "testServant";
     servantConfig.host = "0.0.0.0";
     servantConfig.port = 8888;
-    servantConfig.timeout = 3600;
-    servantConfig.handlerThreadCount = 1;
+    servantConfig.timeout = 30;
+    servantConfig.handlerThreadCount = 2;
     MyDemoDispatcher* dispatcher = new MyDemoDispatcher();
     if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {
         LOG(ERROR) << "create servant fail" << std::endl;

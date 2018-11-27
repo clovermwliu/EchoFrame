@@ -40,6 +40,8 @@ namespace MF {
     const uint32_t g_max_packet_length = 1024 * 1024; //默认的最大数据包长度
     const uint32_t g_default_wheel_timer_slot_count = 1024 * 1024; //最大slot个数
 
+    const uint32_t g_max_udp_packet_length = 1500; //udp最大数据包长度
+
     
     typedef enum EndpointProtocol : uint32_t {
         kTCP = 0,

@@ -131,6 +131,12 @@ namespace MF {
         int32_t MySocket::readFrom(struct sockaddr *addr, socklen_t *addr_len, void *buffer, uint32_t size) {
             return static_cast<int32_t >(::recvfrom(fd, buffer, size, 0, addr, addr_len));
         }
+
+        int32_t MySocket::peekFrom(struct sockaddr *addr, socklen_t *addrLen) {
+            char buf[1] = {0};
+            uint32_t len = 1;
+            return static_cast<uint32_t >(::recvfrom(fd, buf, len, MSG_PEEK, addr, addrLen));
+        }
         
         void MySocket::setSockOpt(int32_t level, int32_t option_name, int32_t value) {
             setsockopt(fd, level, option_name, (void*)(&value), sizeof(value));

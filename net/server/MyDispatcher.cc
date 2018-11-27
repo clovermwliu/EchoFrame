@@ -13,7 +13,7 @@ namespace MF {
         int32_t MyDispatcher::handlePacket(const std::unique_ptr<Buffer::MyIOBuf>& req
                 , std::shared_ptr<MF::Server::MyContext> context) {
 
-            LOG(INFO) << "MyDispatcher::handlePacket" << std::endl;
+            LOG(INFO) << "MyDispatcher::handlePackets" << std::endl;
 
             //1. 分发消息
             std::unique_ptr<Buffer::MyIOBuf> rsp;

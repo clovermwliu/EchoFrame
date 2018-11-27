@@ -263,6 +263,14 @@ namespace MF {
              *  @return 读取到的数据长度
              */
             int32_t readFrom(struct sockaddr *addr, socklen_t *addr_len, void *buffer, uint32_t size);
+
+            /**
+             * 查看消息来源
+             * @param addr addr
+             * @param addrLen addrlen
+             * @return 消息的长度
+             */
+            int32_t peekFrom(struct sockaddr* addr, socklen_t *addrLen);
             
             /**
              *  @brief 获取对端的ip

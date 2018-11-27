@@ -41,12 +41,6 @@ namespace MF {
             template<typename T>
             std::shared_ptr<T> getServantProxy(const std::string& servantName);
 
-            /**
-             * 设置client 配置
-             */
-//            void addClientConfig( const std;:{
-//                proxyConfigs[servantName] = config;
-//            }
         protected:
             std::map<std::string, std::shared_ptr<ServantProxy>> proxys; //已经建立的proxys
 
@@ -86,6 +80,8 @@ namespace MF {
 
             //3. 更新旧的proxy
             auto proxy = proxys[servantName];
+
+            //更新配置
             proxy->update(proxyConfig); //更新配置
         }
 
@@ -105,6 +101,8 @@ namespace MF {
             //2. 构造新的proxy
             auto proxy = dynamic_pointer_cast<ServantProxy>(
                     std::make_shared<T>(loops));
+            //设置handler
+            proxy->setHandlerExecutor(this->handlerExecutor);
 
             //3. 保存到map
             proxys[servantName] = proxy;

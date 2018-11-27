@@ -15,8 +15,6 @@ namespace MF {
             //回复响应
             rsp = "Your name is " + req ;
 
-            std::this_thread::sleep_for(std::chrono::seconds(4));
-
             return kHandleResultSuccess;
         }
 

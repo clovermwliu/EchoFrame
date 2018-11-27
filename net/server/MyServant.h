@@ -62,11 +62,49 @@ namespace MF {
             void stopServant();
 
         protected:
+
             /**
-             * 构造一个Channel
-             * @return channel
+             * 有数据可以读取
              */
-            virtual void createChannel(Socket::MySocket* socket) = 0;
+            void onRead(EV::MyWatcher* watcher);
+
+            /**
+             * 需要发送数据
+             * @param watcher watcher
+             */
+            void onWrite(EV::MyWatcher* watcher);
+
+            /**
+             * 客户端超时
+             * @param watcher watchere
+             */
+            void onTimeout(MF::EV::MyWatcher *watcher);
+
+            /**
+             * 处理所有收到的数据包
+             * @param channel
+             */
+            virtual void handlePackets(std::shared_ptr<MyChannel> channel);
+
+            /**
+             * 数据包完整
+             */
+            virtual void onReadComplete(std::shared_ptr<MyChannel> channel, const char* buf, uint32_t len) ;
+
+            /**
+             * 数据包读取出错
+             * @param channel
+             */
+            virtual void onReadError(std::shared_ptr<MyChannel> channel);
+
+        protected:
+            /**
+             * 执行read操作
+             * @param watcher watcher
+             * @return 对应的channel对象
+             */
+            virtual std::shared_ptr<MyChannel> doRead(EV::MyWatcher* watcher) = 0;
+
         protected:
 
             ServantConfig config; //servant 配置
@@ -110,36 +148,53 @@ namespace MF {
             void onAccept(EV::MyWatcher* watcher);
 
             /**
-             * 有数据可以读取
-             */
-            void onRead(EV::MyWatcher* watcher);
-
-            /**
-             * 需要发送数据
+             * 执行read操作
              * @param watcher watcher
+             * @return channel对象
              */
-            void onWrite(EV::MyWatcher* watcher);
+            shared_ptr<MyChannel> doRead(EV::MyWatcher *watcher) override;
 
             /**
-             * 连接超时
-             * @param watcher watcher
+             * 构造channel
+             * @param socket socket对象
              */
-            void onTimeout(EV::MyWatcher* watcher);
-
-            void createChannel(Socket::MySocket *socket) override;
-
-            /**
-             * 数据包完整
-             */
-            void onReadComplete(std::shared_ptr<MyChannel> channel, const char* buf, uint32_t len) ;
-
-            /**
-             * 数据包读取出错
-             * @param channel
-             */
-            void onReadError(std::shared_ptr<MyChannel> channel);
+            void createChannel(Socket::MySocket *socket) ;
 
         protected:
+        };
+
+        /**
+         * udp servant
+         */
+        class MyUdpServant : public MyServant {
+        public:
+            /**
+             * 构造函数
+             * @param loopManager 事件循环
+             * @param dispatcher 事件分发器
+             */
+            MyUdpServant(EventLoopManager *loopManager, MyDispatcher *dispatcher);
+
+            /**
+             * 启动servant
+             * @return servant
+             */
+            int32_t startServant() override;
+
+        protected:
+            /**
+             * 构造channel
+             * @param socket socket
+             */
+            std::shared_ptr<MyUdpChannel> createChannel(
+                    Socket::MySocket *socket, const std::string& ip, uint16_t port) ;
+
+            /**
+             * 执行读取操作
+             * @param watcher watcher
+             * @return channel
+             */
+            shared_ptr<MyChannel> doRead(EV::MyWatcher *watcher) override;
         };
     }
 }

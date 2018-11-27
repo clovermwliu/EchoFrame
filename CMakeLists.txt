@@ -37,7 +37,6 @@ set(SOURCE_FILES
         net/server/MyFilter.cc net/server/MyFilter.h
         net/demo/MyDemoHandler.cc net/demo/MyDemoHandler.h
         net/server/MyHandler.h
-        net/demo/MyDemoCodec.h
         net/server/EventLoop.cc net/server/EventLoop.h
         net/client/MyClient.cc net/client/MyClient.h
         net/client/MyProxy.cc net/client/MyProxy.h

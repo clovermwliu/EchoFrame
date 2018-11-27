@@ -17,6 +17,25 @@ namespace MF {
         public:
             MyDemoProxy(Client::ClientLoopManager *loops);
 
+            /**
+             * 设置用户名
+             * @param username username
+             * @return 结果
+             */
+            std::string setUsername(const std::string& username);
+
+            /**
+             * 设置password
+             * @param password password
+             * @return  结果
+             */
+            std::string setPassword(const std::string& password);
+
+            /**
+             * 断开链接
+             */
+            void quit();
+
         protected:
             int32_t isPacketComplete(const char *buf, uint32_t len) override;
 

@@ -163,14 +163,14 @@ namespace MF {
                 return uid;
             }
 
-            void setUid(uint32_t uid) {
+            void setUid(uint64_t uid) {
                 MyWatcherBase::uid = uid;
             }
 
         protected:
             T watcher_; //事件
 
-            uint32_t uid{0}; //链接id
+            uint64_t uid{0}; //链接id
         private:
         };
         

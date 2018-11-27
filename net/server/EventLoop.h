@@ -39,7 +39,7 @@ namespace MF {
             std::shared_ptr<MyChannel> findChannel(uint32_t uid);
 
         protected:
-            std::map<uint32_t , std::shared_ptr<MyChannel> > channels; //连接map
+            std::map<uint64_t , std::shared_ptr<MyChannel> > channels; //连接map
         };
 
         class EventLoopManager {
@@ -97,7 +97,7 @@ namespace MF {
              * @param uid uid
              * @return loop
              */
-            EventLoop* getByUid(uint32_t uid) {
+            EventLoop* getByUid(uint64_t uid) {
                 if (loops_.empty()) {
                     return nullptr;
                 }
@@ -110,7 +110,7 @@ namespace MF {
              * @param uid uid
              * @return channel
              */
-            std::shared_ptr<MyChannel> findChannel(uint32_t uid ) {
+            std::shared_ptr<MyChannel> findChannel(uint64_t uid ) {
                 auto lp = getByUid(uid);
                 return lp == nullptr ? nullptr : lp->findChannel(uid);
             }
