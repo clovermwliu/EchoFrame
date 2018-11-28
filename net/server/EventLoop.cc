@@ -69,7 +69,7 @@ namespace MF {
             channels.erase(channel->getUid());
         }
 
-        std::shared_ptr<MyChannel> EventLoop::findChannel(uint32_t uid) {
+        std::shared_ptr<MyChannel> EventLoop::findChannel(uint64_t uid) {
             return channels.find(uid) != channels.end() ? channels[uid] : nullptr;
         }
     }

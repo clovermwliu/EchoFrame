@@ -82,10 +82,6 @@ namespace MF {
                 return socket;
             }
 
-            EV::MyIOWatcher *getReadWatcher() const {
-                return readWatcher;
-            }
-
             void setReadWatcher(EV::MyIOWatcher *readWatcher) {
                 MyClient::readWatcher = readWatcher;
             }
@@ -93,8 +89,6 @@ namespace MF {
             ClientLoop *getLoop() const {
                 return loop;
             }
-
-            uint32_t getConnectTime() const;
 
             bool connected() const {
                 return socket->connected();
@@ -134,7 +128,7 @@ namespace MF {
             /**
              * 重新链接
              */
-            virtual std::future<int32_t > reconnect() = 0;
+            virtual void reconnect() = 0;
 
             /**
              * 异步connect
@@ -142,7 +136,7 @@ namespace MF {
              * @return 返回数据
              */
             virtual std::future<int32_t > asyncConnect(
-                    const ClientConfig& config, ClientLoop* loop, OnConnectFunction && func) = 0;
+                    const ClientConfig& config, ClientLoop* loop, OnConnectFunction && func) {}
 
             /**
              * 有数据可以读
@@ -183,11 +177,11 @@ namespace MF {
             virtual int32_t sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) = 0;
 
             /**
-             * 取出数据包
+             * 获取一个完整的数据包
              * @param length length
-             * @return 0 成功 other 失败
+             * @return 数据包
              */
-            virtual std::unique_ptr<Buffer::MyIOBuf> fetchPayload( uint32_t length) = 0;
+            virtual std::unique_ptr<Buffer::MyIOBuf> fetchPayload(uint32_t length);
 
             /**
              * 当超时时需要做的事情
@@ -200,10 +194,10 @@ namespace MF {
              * 有数据可以读
              * @param watcher watcher
              */
-            virtual void onConnect(EV::MyWatcher *watcher) = 0;
+            virtual void onConnect(EV::MyWatcher *watcher) {};
 
         protected:
-            uint32_t uid{0}; //uid
+            uint64_t uid{0}; //uid
 
             Socket::MySocket* socket{nullptr}; //socket
             std::promise<int32_t >* connectPromise; //connect promise
@@ -222,8 +216,6 @@ namespace MF {
             uint32_t connectTime; //连接开始的时间
 
             OnConnectFunction onConnectFunc; //连接成功需要执行的方法
-
-            ReadFunction rf; //有数据可读需要执行的东西
         };
 
         /**
@@ -239,7 +231,7 @@ namespace MF {
 
             void disconnect() override;
 
-            std::future<int32_t > reconnect() override;
+            void reconnect() override;
 
             std::future<int32_t> asyncConnect(
                     const ClientConfig &config, ClientLoop* loop, OnConnectFunction && csf) override;
@@ -250,10 +242,31 @@ namespace MF {
 
             int32_t sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) override;
 
-            std::unique_ptr<Buffer::MyIOBuf> fetchPayload(uint32_t length) override;
-
         protected:
             void onConnect(EV::MyWatcher *watcher) override;
+        };
+
+        class MyUdpClient : public MyClient {
+        public:
+            MyUdpClient(uint16_t servantId);
+
+            ~MyUdpClient() override;
+
+            int32_t connect(const ClientConfig &config, ClientLoop* loop) override;
+
+            void disconnect() override;
+
+            void reconnect() override;
+
+            int32_t onRead() override;
+
+            int32_t sendPayload(const char *buffer, uint32_t length) override;
+
+            int32_t sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) override;
+
+        protected:
+
+
         };
     }
 }

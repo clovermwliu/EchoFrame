@@ -34,8 +34,11 @@ namespace MF {
             return requests.find(requestId) != requests.end() ? requests[requestId] : nullptr;
         }
 
-        uint32_t MyClient::getConnectTime() const {
-            return connectTime;
+        std::unique_ptr<Buffer::MyIOBuf> MyClient::fetchPayload(uint32_t length) {
+            char* buf = readBuffer->getReadableAndMove(&length);
+            auto iobuf = Buffer::MyIOBuf::create(length);
+            iobuf->write<char*>(buf, length);
+            return iobuf;
         }
 
         void MyClient::whenRequestTimeout(std::function<void()> &&pred, uint64_t requestId) {
@@ -53,7 +56,7 @@ namespace MF {
         }
 
         MyTcpClient::MyTcpClient(uint16_t servantId) : MyClient(servantId){
-            socket->socket(PF_INET, SOCK_STREAM, 0);
+            socket->socket(AF_INET, SOCK_STREAM, 0);
             uid = static_cast<uint32_t >(socket->getfd() << 16 | servantId);
         }
 
@@ -98,7 +101,7 @@ namespace MF {
             }
         }
 
-        std::future<int32_t > MyTcpClient::reconnect() {
+        void MyTcpClient::reconnect() {
             //1. 断开链接
             disconnect();
 
@@ -106,12 +109,10 @@ namespace MF {
             socket = new Socket::MySocket();
             if (socket->socket(AF_INET, SOCK_STREAM, 0) != 0) {
                 LOG(ERROR) << "socket fail" << std::endl;
-                connectPromise->set_value(-1); //连接失败
-                return connectPromise->get_future();
             }
 
             //3. 连接
-            return asyncConnect(this->config, this->loop, std::move(this->onConnectFunc));
+            asyncConnect(this->config, this->loop, std::move(this->onConnectFunc));
         }
 
         std::future<int32_t> MyTcpClient::asyncConnect(
@@ -144,13 +145,6 @@ namespace MF {
                 self->getSocket()->write((void*)buffer, length);
             });
             return 0;
-        }
-
-        std::unique_ptr<Buffer::MyIOBuf> MyTcpClient::fetchPayload(uint32_t length) {
-            char* buf = readBuffer->getReadableAndMove(&length);
-            auto iobuf = Buffer::MyIOBuf::create(length);
-            iobuf->write<char*>(buf, length);
-            return iobuf;
         }
 
         void MyTcpClient::onConnect(EV::MyWatcher *watcher) {
@@ -209,6 +203,101 @@ namespace MF {
                 auto buffer = tmpBuf->readable();
                 auto length = tmpBuf->getReadableLength();
                 self->getSocket()->write(buffer, length);
+            });
+
+            return 0;
+        }
+
+        MyUdpClient::MyUdpClient(uint16_t servantId) : MyClient(servantId) {
+            socket->socket(AF_INET, SOCK_DGRAM, 0);
+            uid = static_cast<uint32_t >(socket->getfd() << 16 | servantId);
+        }
+
+        MyUdpClient::~MyUdpClient() {
+            disconnect();
+        }
+
+        int32_t MyUdpClient::connect(const MF::Client::ClientConfig &config, MF::Client::ClientLoop *loop) {
+            this->config = config; //保存配置
+            this->loop = loop; //保存loop
+            this->onConnectFunc = nullptr; //连接成功需要执行的回调
+            socket->setNonBlock(); //设置异步
+            this->connectTime = MyTimeProvider::now(); //设置连接时间
+//            return socket->connect(config.host, config.port);
+            return 0;
+        }
+
+        void MyUdpClient::disconnect() {
+            if (socket != nullptr) {
+                delete(socket);
+                socket = nullptr;
+            }
+
+            if (readWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(readWatcher);
+                readWatcher = nullptr;
+            }
+        }
+
+        void MyUdpClient::reconnect() {
+            //断开链接
+            disconnect();
+
+            //重新链接
+            connect(this->config, this->loop);
+        }
+
+        int32_t MyUdpClient::onRead() {
+            int32_t rv = 0;
+            uint32_t len = g_max_udp_packet_length;
+            while(true) {
+                char* buf = readBuffer->writeable(len);
+
+                //读取数据
+                sockaddr_in addr = {0};
+                socklen_t addrLen = sizeof(addr);
+                int32_t readLen = socket->readFrom(reinterpret_cast<sockaddr*>(&addr), &addrLen, buf, len);
+                if (readLen <= 0) {
+                    rv = -1;
+                    break;
+                }
+
+                //移动指针
+                readBuffer->moveWriteable(static_cast<uint32_t >(static_cast<uint32_t >(readLen)));
+
+                //增加读取到的长度
+                rv += readLen;
+            }
+
+            return rv;
+        }
+
+        int32_t MyUdpClient::sendPayload(const char *buffer, uint32_t length) {
+            if (length > g_max_udp_packet_length) {
+                LOG(ERROR) << "udp send buffer overflow, max: " << g_max_udp_packet_length << std::endl;
+                return -1;
+            }
+            return socket->writeTo(config.host, config.port, const_cast<char*>(buffer), length);
+        }
+
+        int32_t MyUdpClient::sendPayload(std::unique_ptr<MF::Buffer::MyIOBuf> iobuf) {
+            auto self = std::dynamic_pointer_cast<MyUdpClient>(shared_from_this());
+            auto ptr = iobuf.release();
+            loop->RunInThread([self, ptr]() -> void {
+                std::unique_ptr<Buffer::MyIOBuf> tmpBuf(ptr);
+                auto buffer = tmpBuf->readable();
+                auto length = tmpBuf->getReadableLength();
+                //打印发送失败
+                if (length > g_max_udp_packet_length) {
+                    LOG(ERROR) << "udp send buffer overflow, max: " << g_max_udp_packet_length << std::endl;
+                    return;
+                }
+                if(self->socket->writeTo(self->config.host, self->config.port, buffer, length) <= 0) {
+                    EAGAIN;
+                    auto err = errno;
+                    LOG(ERROR) << "send packet fail, host: " << self->config.host
+                    << ",port: " << self->config.port << ", error: " << strerror(err) << ", err: " << err << std::endl;
+                }
             });
 
             return 0;

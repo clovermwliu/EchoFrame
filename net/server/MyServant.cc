@@ -36,6 +36,8 @@ namespace MF {
             //读取数据并处理
             auto channel = doRead(watcher);
             if (channel != nullptr) {
+                //有数据到到达了，重新设置超时定时器
+                channel->resetTimer(config.timeout);
                 handlePackets(channel);
             }
         }
@@ -43,7 +45,7 @@ namespace MF {
         void MyServant::onWrite(MF::EV::MyWatcher *watcher) {
             LOG(INFO) << "MyServant::onWrite" << std::endl;
             //1. 获取uid
-            uint32_t uid = dynamic_cast<EV::MyAsyncWatcher*>(watcher)->getUid();
+            uint64_t uid = dynamic_cast<EV::MyAsyncWatcher*>(watcher)->getUid();
 
             //2. 检查channel是否有效
             auto channel = loopManager->findChannel(uid);
@@ -62,8 +64,10 @@ namespace MF {
 
         //链接超时了，需要断开
         void MyServant::onTimeout(MF::EV::MyWatcher *watcher) {
+            LOG(INFO) << "MyServant::onTimeout"<<std::endl;
+
             //1. 获取uid
-            uint32_t uid = dynamic_cast<EV::MyTimerWatcher*>(watcher)->getUid();
+            uint64_t uid = dynamic_cast<EV::MyTimerWatcher*>(watcher)->getUid();
 
             //2. 检查channel是否有效
             auto channel = loopManager->findChannel(uid);
@@ -73,9 +77,9 @@ namespace MF {
             }
 
             //3. 检查是否超时
-            if (MyTimeProvider::now() - channel->getLastReceiveTime() <= config.timeout) {
-                return;
-            }
+//            if (MyTimeProvider::now() - channel->getLastReceiveTime() <= config.timeout) {
+//                return;
+//            }
 
             //3. 通知上层
             auto context = std::make_shared<MyContext>(std::weak_ptr<MyChannel>(channel));
@@ -230,7 +234,7 @@ namespace MF {
             EV::MyAsyncWatcher* writeWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyAsyncWatcher>(
                     std::bind(&MyTcpServant::onWrite, this, std::placeholders::_1));
             auto timeoutWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyTimerWatcher>(
-                    std::bind(&MyTcpServant::onTimeout, this, std::placeholders::_1), config.timeout, config.timeout);
+                    std::bind(&MyTcpServant::onTimeout, this, std::placeholders::_1), config.timeout, 0);
 
             //设置ev data
             ioWatcher->setUid(channel->getUid());
@@ -258,7 +262,7 @@ namespace MF {
 
         shared_ptr<MyChannel> MyTcpServant::doRead(EV::MyWatcher *watcher) {
             //1. 获取uid
-            uint32_t uid = dynamic_cast<EV::MyIOWatcher*>(watcher)->getUid();
+            uint64_t uid = dynamic_cast<EV::MyIOWatcher*>(watcher)->getUid();
 
             //2. 获取channel
             auto channel = loopManager->findChannel(uid);
@@ -314,14 +318,7 @@ namespace MF {
                 return -1; //初始化失败
             }
 
-            //3. listen
-            if (socket->listen(g_default_listen_backlog) != 0) {
-                LOG(ERROR) << "listen socket fail, host: " << host << ", port: " << port
-                           << ", error: " << strerror(errno) << std::endl;
-                return -1; //初始化失败
-            }
-
-            //4. 构造watcher
+            //3. 构造watcher
             readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
                     std::bind(&MyUdpServant::onRead, this, std::placeholders::_1), socket->getfd(), EV_READ);
             loop->add(readWatcher);
@@ -345,7 +342,7 @@ namespace MF {
             EV::MyAsyncWatcher* writeWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyAsyncWatcher>(
                     std::bind(&MyUdpServant::onWrite, this, std::placeholders::_1));
             auto timeoutWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyTimerWatcher>(
-                    std::bind(&MyUdpServant::onTimeout, this, std::placeholders::_1), config.timeout, config.timeout);
+                    std::bind(&MyUdpServant::onTimeout, this, std::placeholders::_1), config.timeout, 0);
 
             //设置ev data
             writeWatcher->setUid(channel->getUid());
@@ -363,9 +360,8 @@ namespace MF {
             channel->setLoop(ioLoop);
             loopManager->addChannel(channel);
 
-            LOG(INFO) << "client connected, ip: " << socket->getRemoteHost()
-                      << ", port: " << socket->getRemotePort()
-                      << ", uid: " << channel->getUid() << std::endl;
+            LOG(INFO) << "client connected, ip: " << ip << ", port: " << port
+            << ", uid: " << channel->getUid() << std::endl;
 
             return channel;
         }

@@ -36,7 +36,7 @@ namespace MF {
              * @param uid uid
              * @return channel
              */
-            std::shared_ptr<MyChannel> findChannel(uint32_t uid);
+            std::shared_ptr<MyChannel> findChannel(uint64_t uid);
 
         protected:
             std::map<uint64_t , std::shared_ptr<MyChannel> > channels; //连接map

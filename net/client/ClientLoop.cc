@@ -17,7 +17,7 @@ namespace MF {
             clients[client->getUid()] = client;
         }
 
-        std::shared_ptr<MyClient> ClientLoop::findClient(uint32_t uid) {
+        std::shared_ptr<MyClient> ClientLoop::findClient(uint64_t uid) {
             return clients.find(uid) != clients.end() ? clients[uid] : nullptr;
         }
 

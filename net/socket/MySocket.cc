@@ -110,18 +110,19 @@ namespace MF {
         int32_t MySocket::writeTo(const std::string &host, uint16_t port, void *buffer, uint32_t length) {
             
             struct sockaddr_in addr;
-            bzero(&addr, sizeof(addr));
+            bzero(&addr, sizeof(struct sockaddr_in));
+
             addr.sin_family = domain;
             addr.sin_addr.s_addr = inet_addr(host.c_str());
             addr.sin_port = htons(port);
-            
+
             return static_cast<int32_t >(
-                    writeTo((const struct sockaddr *) (&addr), buffer, length));
+                    writeTo((struct sockaddr *) (&addr), buffer, length));
         }
         
-        int32_t MySocket::writeTo(const struct sockaddr *addr, void *buffer, uint32_t length) {
+        int32_t MySocket::writeTo(struct sockaddr *addr, void *buffer, uint32_t length) {
             return static_cast<int32_t >(
-                    ::sendto(fd, buffer, length, 0, (const struct sockaddr*)(&addr), sizeof(struct sockaddr)));
+                    ::sendto(fd, buffer, length, 0, addr, sizeof(sockaddr)));
         }
         
         int32_t MySocket::read(void *buffer, uint32_t size) {

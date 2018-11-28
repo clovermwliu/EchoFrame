@@ -28,31 +28,6 @@ namespace MF {
             }
         }
 
-        void MyChannel::close() {
-            if (this->socket != nullptr) {
-                delete(this->socket);
-            }
-
-            if (readWatcher != nullptr) {
-                EV::MyWatcherManager::GetInstance()->destroy(readWatcher);
-            }
-
-            if (writeWatcher != nullptr) {
-                EV::MyWatcherManager::GetInstance()->destroy(writeWatcher);
-            }
-
-            if (timeoutWatcher != nullptr) {
-                EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
-            }
-        }
-
-        uint32_t MyChannel::fetchPacket(char **buf, uint32_t length) {
-            uint32_t readLen = length;
-            *buf = readBuf->getReadableAndMove(&readLen);
-
-            return readLen;
-        }
-
         std::unique_ptr<Buffer::MyIOBuf> MyChannel::fetchPacket(uint32_t length) {
             uint32_t readLen = length;
             char* tmp = readBuf->getReadableAndMove(&readLen);
@@ -78,12 +53,14 @@ namespace MF {
             MyChannel::writeWatcher = writeWatcher;
         }
 
-        EV::MyTimerWatcher *MyChannel::getTimeoutWatcher() const {
-            return timeoutWatcher;
-        }
-
         void MyChannel::setTimeoutWatcher(EV::MyTimerWatcher *timeoutWatcher) {
             MyChannel::timeoutWatcher = timeoutWatcher;
+        }
+
+        void MyChannel::resetTimer(uint32_t timeout) {
+            timeoutWatcher->stop();
+            timeoutWatcher->set(timeout, 0);
+            timeoutWatcher->start();
         }
 
         EventLoop* MyChannel::getLoop() const {
@@ -153,6 +130,24 @@ namespace MF {
             return length;
         }
 
+        void MyTcpChannel::close() {
+            if (this->socket != nullptr) {
+                delete(this->socket);
+            }
+
+            if (readWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(readWatcher);
+            }
+
+            if (writeWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(writeWatcher);
+            }
+
+            if (timeoutWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
+            }
+        }
+
         MyUdpChannel::MyUdpChannel(MF::Socket::MySocket *socket, const std::string& ip, uint16_t port)
         : MyChannel(socket){
             this->ip = ip;
@@ -216,7 +211,7 @@ namespace MF {
                     }
 
                     send += sent; //保存已发送的数据长度
-            }
+                }
 
                 //2. 移动指针
                 writeBuf->moveReadable(flag);
@@ -241,6 +236,16 @@ namespace MF {
                 this->writeWatcher->signal();
             }
             return length;
+        }
+
+        void MyUdpChannel::close() {
+            if (writeWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(writeWatcher);
+            }
+
+            if (timeoutWatcher != nullptr) {
+                EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
+            }
         }
     }
 }

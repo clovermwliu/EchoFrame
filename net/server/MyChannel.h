@@ -31,7 +31,7 @@ namespace MF {
             /**
              * 关闭通道
              */
-            virtual void close();
+            virtual void close() = 0;
 
             /**
              * 读取数据
@@ -64,14 +64,6 @@ namespace MF {
             virtual int32_t onWrite() = 0;
 
             /**
-             * 将可以读取的数据拷贝出来
-             * @param buf
-             * @param length
-             * @return 实际取到的长度
-             */
-            uint32_t fetchPacket(char** buf, uint32_t length);
-
-            /**
              * 将可以读的数据读出来
              * @param length
              * @return
@@ -98,9 +90,17 @@ namespace MF {
              */
             void setWriteWatcher(EV::MyAsyncWatcher *writeWatcher);
 
-            EV::MyTimerWatcher *getTimeoutWatcher() const;
-
+            /**
+             * 设置超时watcher
+             * @param timeoutWatcher timeout watcher
+             */
             void setTimeoutWatcher(EV::MyTimerWatcher *timeoutWatcher);
+
+            /**
+             * 超时定时器重新计时
+             * @param timeout timeout
+             */
+            void resetTimer(uint32_t timeout);
 
             /**
              * 获取uid
@@ -131,7 +131,6 @@ namespace MF {
 
             //read buffer
             Buffer::MySKBuffer* readBuf {nullptr};
-            std::mutex readBufMutex;
 
             uint64_t lastReceiveTime{0}; //最近一次接收到消息的时间
         };
@@ -148,6 +147,11 @@ namespace MF {
             int32_t onWrite() override;
 
             uint32_t sendResponse(const char *buf, uint32_t length) override;
+
+            /**
+             * 关闭channel，需要关闭socket和所有watcher
+             */
+            void close() override;
         };
 
         /**
@@ -164,6 +168,11 @@ namespace MF {
             static uint64_t createUid(const std::string& ip, uint16_t port);
 
             uint32_t sendResponse(const char *buf, uint32_t length) override;
+
+            /**
+             * 关闭channel, 不需要关闭socket和readwatcher
+             */
+            void close() override;
 
         private:
             std::string ip;

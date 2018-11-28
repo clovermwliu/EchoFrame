@@ -38,7 +38,7 @@ namespace MF{
              * @param uid
              * @return client 对象
              */
-            std::shared_ptr<MyClient> findClient(uint32_t uid);
+            std::shared_ptr<MyClient> findClient(uint64_t uid);
 
             /**
              * 根据host 和 port查找client
@@ -147,7 +147,7 @@ namespace MF{
              * @param uid
              * @return client 对象
              */
-            std::shared_ptr<MyClient> findClient(uint32_t uid) {
+            std::shared_ptr<MyClient> findClient(uint64_t uid) {
                 auto lp = getByServantId(uid & 0xFFFF);
                 return lp == nullptr ? nullptr : lp->findClient(uid);
             }

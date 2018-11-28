@@ -20,7 +20,7 @@ namespace MF {
             std::string name; //servant 名称
             std::string host; //绑定的host
             uint16_t port; //绑定的端口
-            uint64_t timeout; //client 超时断连时间(s)
+            uint32_t timeout; //client 超时断连时间(s)
             uint32_t handlerThreadCount; //handler线程数
         };
 

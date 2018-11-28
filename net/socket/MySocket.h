@@ -240,8 +240,8 @@ namespace MF {
              *
              *  @return 写入的数据长度
              */
-            int32_t writeTo(const struct sockaddr *addr, void *buffer, uint32_t length);
-            
+            int32_t writeTo(struct sockaddr *addr, void *buffer, uint32_t length);
+
             /**
              *  @brief 读取一段数据
              *

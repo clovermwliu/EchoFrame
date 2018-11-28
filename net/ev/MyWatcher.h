@@ -159,7 +159,7 @@ namespace MF {
                 return &watcher_;
             }
 
-            uint32_t getUid() const {
+            uint64_t getUid() const {
                 return uid;
             }
 
@@ -239,6 +239,20 @@ namespace MF {
                 ev_timer_set(&watcher_, after, repeat);
                 is_valid_ = true;
                 return this;
+            }
+
+            /**
+             * 开启任务
+             */
+            void start() {
+                ev_timer_start(loop(), &watcher_);
+            }
+
+            /**
+             * 停止计时器
+             */
+            void stop() {
+                ev_timer_stop(loop(), &watcher_);
             }
             
             //添加到事件循环

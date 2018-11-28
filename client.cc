@@ -41,10 +41,11 @@ int main(int argc, const char * argv[]) {
     //设置proxy可连接的服务信息
     auto servantName = "testServant";
     ClientConfig clientConfig;
-    clientConfig.host = "127.0.0.1";
-    clientConfig.port = 8888;
+    clientConfig.host = "0.0.0.0";
+    clientConfig.port = 8889;
     clientConfig.timeout = 3;
     clientConfig.autoReconnect = true;
+    clientConfig.clientType = kClientTypeUdp;
     std::vector<ClientConfig> clientConfigs;
     clientConfigs.push_back(clientConfig);
     MyCommunicator::GetInstance()->update(servantName, clientConfigs);

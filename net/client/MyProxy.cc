@@ -55,7 +55,29 @@ namespace MF {
         }
 
         int32_t MyProxy::addUdpClient(const MF::Client::ClientConfig &config) {
-            return -1;
+            //1. 构造client
+            auto client = std::make_shared<MyUdpClient>(hash(getServantName()) % 0xFFF);
+            //保存client
+            loops->addClient(client);
+
+            //2. 连接
+            auto loop = loops->getByServantId(client->getServantId());
+            auto self = shared_from_this();
+            if(client->connect(config, loop) != 0) {
+                LOG(ERROR) << "connect fail, host: " << config.host << ", port: " << config.port << std::endl;
+                return -1;
+            }
+
+            //构造read watcher
+            auto readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
+                    std::bind(&MyProxy::onRead, self.get(), std::placeholders::_1), client->getFd(), EV_READ);
+            //设置uid
+            readWatcher->setUid(client->getUid());
+
+            //watcher保存到事件循环
+            client->getLoop()->add(readWatcher);
+            client->setReadWatcher(readWatcher); //保存readwatcher
+            self->clients.pushBack(std::weak_ptr<MyClient>(client));
         }
 
         std::shared_ptr<MyClient> MyProxy::getClient() {
@@ -78,7 +100,7 @@ namespace MF {
 
         void MyProxy::onRead(MF::EV::MyWatcher *watcher) {
             //1. 获取uid
-            uint32_t uid = dynamic_cast<EV::MyIOWatcher*>(watcher)->getUid();
+            uint64_t uid = dynamic_cast<EV::MyIOWatcher*>(watcher)->getUid();
 
             //2. 获取client
             auto client = loops->findClient(uid);
