@@ -40,7 +40,7 @@ int main(int argc, const char * argv[]) {
     servantConfig.name = "testServant";
     servantConfig.host = "0.0.0.0";
     servantConfig.port = 8888;
-    servantConfig.timeout = 3;
+    servantConfig.timeout = 30;
     servantConfig.handlerThreadCount = 2;
     MyDemoDispatcher* dispatcher = new MyDemoDispatcher();
     if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {
@@ -51,7 +51,7 @@ int main(int argc, const char * argv[]) {
     servantConfig.name = "testServant2";
     servantConfig.host = "0.0.0.0";
     servantConfig.port = 8889;
-    servantConfig.timeout = 3;
+    servantConfig.timeout = 30;
     servantConfig.handlerThreadCount = 2;
     if (server->addServant<MyUdpServant>(servantConfig, dispatcher) !=  0) {
         LOG(ERROR) << "create servant fail" << std::endl;

@@ -58,9 +58,12 @@ namespace MF {
         }
 
         void MyChannel::resetTimer(uint32_t timeout) {
-            timeoutWatcher->stop();
-            timeoutWatcher->set(timeout, 0);
-            timeoutWatcher->start();
+            if (MyTimeProvider::now() - lastReceiveTime >= 1) {
+                //1 秒才修改一次定时器
+                timeoutWatcher->stop();
+                timeoutWatcher->set(timeout, 0);
+                timeoutWatcher->start();
+            }
         }
 
         EventLoop* MyChannel::getLoop() const {
