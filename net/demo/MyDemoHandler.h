@@ -30,7 +30,7 @@ namespace MF {
             int32_t doHandler(
                     const std::unique_ptr<Protocol::MyMessage>& request
                     , std::unique_ptr<Protocol::MyMessage>& response
-                    , std::shared_ptr<Server::MyContext> context) {
+                    , std::shared_ptr<Server::MyContext> context) override {
                 auto req = dynamic_cast<MyDemoMessage<REQ>*>(request.get());
                 REQ reqBody = req->getMsg();
                 RSP rspBody;

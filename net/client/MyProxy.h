@@ -7,7 +7,7 @@
 
 #include <deque>
 #include "net/client/MyClient.h"
-#include "net/client/MyRequest.h"
+#include "net/client/MySession.h"
 #include "util/MyThreadPool.h"
 #include "net/protocol/MyMessage.h"
 #include "util/MyQueue.h"
@@ -160,7 +160,7 @@ namespace MF {
              * 发送数据
              */
             template<typename REQ, typename RSP>
-            std::shared_ptr<MyRequest<REQ, RSP>> buildRequest(std::unique_ptr<REQ> message);
+            std::shared_ptr<MySession<REQ, RSP>> buildSession(std::unique_ptr<REQ> message);
 
             /**
              * decode 消息
@@ -181,14 +181,14 @@ namespace MF {
         };
 
         template<typename REQ, typename RSP>
-        std::shared_ptr<MyRequest<REQ, RSP>> ServantProxy::buildRequest(std::unique_ptr<REQ> message) {
+        std::shared_ptr<MySession<REQ, RSP>> ServantProxy::buildSession(std::unique_ptr<REQ> message) {
             //1. 获取client
             auto client = getClient();
-            auto request = std::shared_ptr<MyRequest<REQ, RSP>>(
-                    new MyRequest<REQ, RSP>(std::weak_ptr<MyClient>(client)));
+            auto session = std::shared_ptr<MySession<REQ, RSP>>(
+                    new MySession<REQ, RSP>(std::weak_ptr<MyClient>(client)));
             if (client == nullptr) {
                 LOG(ERROR) << "all clients are disconnected" << std::endl;
-                return request;
+                return session;
             }
 
             //2. encode
@@ -196,13 +196,13 @@ namespace MF {
                     dynamic_cast<Protocol::MyMessage*>(message.release())));
             auto payload = encode(m);
             if (payload == nullptr) {
-                LOG(ERROR) << "encode message fail, uid: " << request->getRequestId() << std::endl;
+                LOG(ERROR) << "encode message fail, uid: " << session->getRequestId() << std::endl;
                 return nullptr;
             }
 
             //3. 设置request并且设置等待超时时长
-            client->addRequest(request);
-            auto weakRequest = std::weak_ptr<MyRequest<REQ, RSP>> (request);
+            client->addSession(session);
+            auto weakRequest = std::weak_ptr<MySession<REQ, RSP>> (session);
             auto watcher = EV::MyWatcherManager::GetInstance()->create<EV::MyTimerWatcher>(
                     [weakRequest](EV::MyWatcher* watcher) -> void {
                         //1. 检查request是否有效
@@ -212,30 +212,30 @@ namespace MF {
                             return;
                         }
 
-                        LOG(ERROR) << "request timeout, requestId: " << r->getRequestId() << std::endl;
+                        LOG(ERROR) << "session timeout, requestId: " << r->getRequestId() << std::endl;
                         //2. 执行超时任务
                         r->doTimeoutAction();
 
                     }, config.asyncTimeout, 0);
 
             //保存timeout watcher
-            request->setTimeoutWatcher(watcher);
+            session->setTimeoutWatcher(watcher);
 
             //4. 增加数据包头
             auto magicMsg = std::unique_ptr<Protocol::MyMagicMessage>(new Protocol::MyMagicMessage());
             magicMsg->setLength(magicMsg->headLen() + payload->getReadableLength());
             magicMsg->setVersion(static_cast<uint16_t >(1)); //TODO: 版本控制
             magicMsg->setIsRequest(static_cast<int8_t >(1));
-            magicMsg->setRequestId(request->getRequestId());
+            magicMsg->setRequestId(session->getRequestId());
             magicMsg->setServerNumber(0); //TODO: 先设置为0
 
             //5. 编码数据包
             magicMsg->setPayload(std::move(payload));
 
             //6. 保存数据包
-            request->setRequest(std::move(magicMsg));
+            session->setRequest(std::move(magicMsg));
 
-            return request; //返回request
+            return session; //返回request
         }
     }
 }

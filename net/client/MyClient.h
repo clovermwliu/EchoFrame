@@ -23,7 +23,7 @@ namespace MF {
 
         class ClientLoop; //client loop
 
-        class MyBaseRequest; //request
+        class MyBaseSession; //request
 
         typedef enum enumClientType: int32_t {
             kClientTypeTcp = 0, //tcp
@@ -98,20 +98,20 @@ namespace MF {
              * 新增request
              * @param request request
              */
-            void addRequest(const std::shared_ptr<MyBaseRequest>& request );
+            void addSession(const std::shared_ptr<MyBaseSession> &request);
 
             /**
              * 删除一个request
              * @param request request
              */
-            void removeRequest(uint64_t requestId) ;
+            void removeSession(uint64_t requestId) ;
 
             /**
              * 查询request
              * @param requestId requestId
              * @return request
              */
-            std::shared_ptr<MyBaseRequest> findRequest(uint64_t requestId) ;
+            std::shared_ptr<MyBaseSession> findSession(uint64_t requestId) ;
 
             /**
              * 初始化client
@@ -187,7 +187,7 @@ namespace MF {
              * 当超时时需要做的事情
              * @param pred pred
              */
-            void whenRequestTimeout(std::function<void()> &&pred, uint64_t requestId);
+            void whenSessionTimeout(std::function<void()> &&pred, uint64_t requestId);
         protected:
 
             /**
@@ -211,7 +211,7 @@ namespace MF {
             //配置
             ClientConfig config;
 
-            std::map<uint64_t ,std::shared_ptr<MyBaseRequest>> requests;// 已经发出的所有request
+            std::map<uint64_t ,std::shared_ptr<MyBaseSession>> requests;// 已经发出的所有request
 
             uint32_t connectTime; //连接开始的时间
 

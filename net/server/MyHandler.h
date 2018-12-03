@@ -8,6 +8,7 @@
 #include "net/MyGlobal.h"
 #include "net/buffer/myIOBuf.h"
 #include "net/protocol/MyMessage.h"
+#include "net/server/MyContext.h"
 
 namespace MF {
     namespace Server {
@@ -18,9 +19,18 @@ namespace MF {
 
         public:
 
-            virtual ~MyHandler() {
+            /**
+             * 析构函数
+             */
+            virtual ~MyHandler() = default;
 
-            }
+            /**
+             * 执行handler
+             */
+            virtual int32_t doHandler(
+                    const std::unique_ptr<Protocol::MyMessage>& request
+                    , std::unique_ptr<Protocol::MyMessage>& response
+                    , std::shared_ptr<Server::MyContext> context)  = 0;
 
             /**
              * 解码消息

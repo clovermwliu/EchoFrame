@@ -12,6 +12,7 @@
 #include "net/buffer/MySKBuffer.h"
 #include "net/server/MyChannel.h"
 #include "util/MyThreadPool.h"
+#include "route/MyRouteProxy.h"
 
 namespace MF {
     namespace Server{
@@ -22,6 +23,7 @@ namespace MF {
             uint16_t port; //绑定的端口
             uint32_t timeout; //client 超时断连时间(s)
             uint32_t handlerThreadCount; //handler线程数
+            uint32_t version; //版本号
         };
 
         /**
@@ -105,6 +107,11 @@ namespace MF {
              */
             virtual std::shared_ptr<MyChannel> doRead(EV::MyWatcher* watcher) = 0;
 
+            /**
+             * 注册servant
+             */
+            virtual void registerServant();
+
         protected:
 
             ServantConfig config; //servant 配置
@@ -118,6 +125,8 @@ namespace MF {
             EV::MyIOWatcher* readWatcher {nullptr}; //ioWatcher
 
             MyThreadExecutor<int32_t >* handlerExecutor; //handler的执行线程池
+
+            std::string routeServantName = "udpRouteServant"; //route servant name
         };
 
         /**

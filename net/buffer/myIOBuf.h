@@ -82,6 +82,14 @@ namespace MF {
                 return buffer_->readable(&len);
             }
 
+            /**
+             * 移动可读指针
+             * @param len 长度
+             */
+            void moveReadable(uint32_t len) {
+                buffer_->moveReadable(len);
+            }
+
         public:
             
             //基本类型

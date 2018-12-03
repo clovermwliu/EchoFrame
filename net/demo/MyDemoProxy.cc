@@ -9,7 +9,7 @@ namespace MF {
     namespace DEMO {
 
         using DemoMsg = std::unique_ptr<MyDemoMessage<std::string>>;
-        using DemoContext = std::shared_ptr<Client::MyRequest<MyDemoMessage<std::string>, MyDemoMessage<std::string>>>;
+        using DemoContext = std::shared_ptr<Client::MySession<MyDemoMessage<std::string>, MyDemoMessage<std::string>>>;
 
         MyDemoProxy::MyDemoProxy(
                 Client::ClientLoopManager *loops)
@@ -21,9 +21,9 @@ namespace MF {
 
             auto req = std::move(std::unique_ptr<MyDemoMessage<std::string>>(
                     new MyDemoMessage<std::string>("username", username)));
-            auto rsp = this->buildRequest<
+            auto rsp = this->buildSession<
                     MyDemoMessage<std::string>, MyDemoMessage<std::string>
-                            >(std::move(req))->executeAndWait();
+            >(std::move(req))->executeAndWait();
             if (rsp == nullptr) {
                 LOG(INFO) << "wait for response fail, cmd: username " << username << std::endl;
                 return "";
@@ -34,9 +34,9 @@ namespace MF {
         std::string MyDemoProxy::setPassword(const std::string &password) {
             auto req = std::move(std::unique_ptr<MyDemoMessage<std::string>>(
                     new MyDemoMessage<std::string>("password", password)));
-            auto rsp = this->buildRequest<
+            auto rsp = this->buildSession<
                     MyDemoMessage<std::string>, MyDemoMessage<std::string>
-                            >(std::move(req))->executeAndWait();
+            >(std::move(req))->executeAndWait();
             if (rsp == nullptr) {
                 LOG(INFO) << "wait for response fail, cmd: password " << password << std::endl;
                 return "";
@@ -47,7 +47,7 @@ namespace MF {
         void MyDemoProxy::quit() {
             auto req = std::move(std::unique_ptr<MyDemoMessage<std::string>>(
                     new MyDemoMessage<std::string>("quit", "")));
-            this->buildRequest<
+            this->buildSession<
                     MyDemoMessage<std::string>, MyDemoMessage<std::string>
             >(std::move(req))->executeAndWait();
         }

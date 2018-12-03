@@ -256,13 +256,13 @@ namespace MF {
            }
 
            //3. 查找对应的Request
-           auto request = client->findRequest(magicMsg->getRequestId());
+           auto request = client->findSession(magicMsg->getRequestId());
            if (request == nullptr) {
                LOG(ERROR) << "find request fail, requestId: " << magicMsg->getRequestId() << std::endl;
                return ;
            }
            //将request从client 中删除
-           client->removeRequest(magicMsg->getRequestId());
+            client->removeSession(magicMsg->getRequestId());
 
            //处理消息
            auto m = magicMsg.release();

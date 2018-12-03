@@ -23,14 +23,39 @@ namespace MF {
         class MyCommunicator : public MySingleton<MyCommunicator>{
         public:
 
-            void initialize(const CommConfig& config);
+            void initialize(const CommConfig& config){
+                this->config = config;
+                handlerExecutor = new MyThreadExecutor<int32_t >(config.handlerThreadCount);
+                loops = new ClientLoopManager();
+                if (loops->initialize(config.ioThreadCount)) {
+                    LOG(ERROR) << "initialize io thread fail" << std::endl;
+                }
+            }
 
             /**
              * 更新proxy配置
              * @param servantName servant name
              * @param config config
              */
-            void update(const std::string& servantName, const std::vector<ClientConfig>& config);
+            void update(const std::string& servantName, const std::vector<ClientConfig>& config) {
+                std::lock_guard<std::mutex> guard(mutex);
+                //1. 保存起来
+                ProxyConfig proxyConfig;
+                proxyConfig.servantName = servantName;
+                proxyConfig.clients = config;
+                proxyConfigs[servantName] = proxyConfig;
+
+                //2. 新proxy只做保存
+                if (proxys.find(servantName) == proxys.end()) {
+                    return ;
+                }
+
+                //3. 更新旧的proxy
+                auto proxy = proxys[servantName];
+
+                //更新配置
+                proxy->update(proxyConfig); //更新配置
+            }
 
             /**
              * 获取一个ServantProxy
@@ -55,35 +80,14 @@ namespace MF {
             std::map<std::string, ProxyConfig> proxyConfigs;
         };
 
-        void MyCommunicator::initialize(const MF::Client::CommConfig &config) {
-            this->config = config;
-            handlerExecutor = new MyThreadExecutor<int32_t >(config.handlerThreadCount);
-            loops = new ClientLoopManager();
-            if (loops->initialize(config.ioThreadCount)) {
-                LOG(ERROR) << "initialize io thread fail" << std::endl;
-            }
-        }
-
-        void MyCommunicator::update(const std::string &servantName
-                , const vector<MF::Client::ClientConfig> &config) {
-            std::lock_guard<std::mutex> guard(mutex);
-            //1. 保存起来
-            ProxyConfig proxyConfig;
-            proxyConfig.servantName = servantName;
-            proxyConfig.clients = config;
-            proxyConfigs[servantName] = proxyConfig;
-
-            //2. 新proxy只做保存
-            if (proxys.find(servantName) == proxys.end()) {
-                return ;
-            }
-
-            //3. 更新旧的proxy
-            auto proxy = proxys[servantName];
-
-            //更新配置
-            proxy->update(proxyConfig); //更新配置
-        }
+//        void MyCommunicator::initialize(const MF::Client::CommConfig &config) {
+//
+//        }
+//
+//        void MyCommunicator::update(const std::string &servantName
+//                , const vector<MF::Client::ClientConfig> &config) {
+//
+//        }
 
         template<typename T>
         std::shared_ptr<T> MyCommunicator::getServantProxy(const std::string &servantName) {
@@ -99,8 +103,7 @@ namespace MF {
             }
 
             //2. 构造新的proxy
-            auto proxy = dynamic_pointer_cast<ServantProxy>(
-                    std::make_shared<T>(loops));
+            auto proxy = dynamic_pointer_cast<ServantProxy>(std::make_shared<T>(loops));
             //设置handler
             proxy->setHandlerExecutor(this->handlerExecutor);
 

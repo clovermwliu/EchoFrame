@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+//命令字
+enum RouteCommandCode {
+    kCommandCodeRegister = 0; //服务注册
+    kCommandCodeUnRegister = 1; //服务反注册
+    kCommandCodeOperate = 3; //修改服务状态
+    kCommandCodeStatistic = 4; //上报统计
+    kCommandCodePullTable = 10; //拉取路由表
+    kCommandCodeHeartBeat = 99; //心跳
+};
+
+//结果码
+enum RouteResultCode {
+    kResultCodeSuccess = 0; //成功
+    kResultCodeInvalidRequest = 1; //非法请求
+    kResultCodeFailure = 99; //失败
+};
+
+//节点状态
+enum NodeStatus {
+    kNodeStatusOnline = 0; //节点在线
+    kNodeStatusOffline = 1; //节点不在线
+    kNodeStatusPaused = 2; //节点暂停服务
+    kNodeStatusResume = 3; //节点对外提供服务
+    kNodeStatusOverload = 5; //节点过载
+    kNodeStatusLost = 6; //节点失联
+}
+
+//路由算法
+enum RouteStrategy {
+    kStrategyRoundRoad = 0; //轮询
+    kStrategyLoadBalance = 1; //负载均衡
+    kStrategyNodeWeight = 2; //按权重分配
+}
+
+//节点信息
+message NodeInfo {
+    string host = 1; //host
+    uint32 port = 2; //port
+    string serverName = 3; // server name
+    string servantName = 4; // servant name
+    NodeStatus status = 5; //status
+};
+
+//路由表条目
+message TableItem {
+    string nodeId = 1; //节点id
+    NodeInfo nodeInfo = 2; //节点信息
+}
+
+//路由注册
+message RegisterReq {
+    NodeInfo nodeInfo = 1; //路由表条目
+    uint32 version = 2; //本地路由表版本, 0标识没有路由表
+};
+
+message RegisterRsp {
+   uint32 code = 1; //操作结果
+   string nodeId = 2; //节点标识
+}
+
+//服务状态变更
+message OperateReq {
+   string nodeId = 1; //节点标识
+   uint32 status = 2; //状态
+}
+
+message OperateRsp {
+    uint32 code = 1; //操作结果
+    string nodeId = 2; //节点标识
+    uint32 status = 3; //节点的新状态
+}
+
+//拉取路由表
+message PullTableReq {
+    uint32 version = 1; //本地路由表版本
+}
+
+message PullTableRsp {
+    uint32 version = 1; //新版本
+    RouteStrategy strategy = 2; //路由策略
+    repeated TableItem items = 3; //路由列表
+}
+
+//心跳
+message Heartbeat {
+    uint32 version = 1; //node节点和中心节点的路由版本号
+}
+

@@ -25,11 +25,11 @@ using namespace MF::DEMO;
 using namespace MF::Client;
 
 using DemoMsg = std::unique_ptr<MyDemoMessage<std::string>>;
-using DemoContext = std::shared_ptr<MyRequest<MyDemoMessage<std::string>, MyDemoMessage<std::string>>>;
+using DemoContext = std::shared_ptr<MySession<MyDemoMessage<std::string>, MyDemoMessage<std::string>>>;
 
 using Action = std::function<int32_t (
         const std::unique_ptr<MyDemoMessage<std::string>>&
-                , const std::shared_ptr<MyRequest<MyDemoMessage<std::string>,MyDemoMessage<std::string>>>&)>;
+                , const std::shared_ptr<MySession<MyDemoMessage<std::string>,MyDemoMessage<std::string>>>&)>;
 int main(int argc, const char * argv[]) {
 
     //初始化comm

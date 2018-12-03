@@ -3,6 +3,7 @@
 //
 
 #include "net/server/MyServant.h"
+#include "net/client/MyCommunicator.h"
 namespace MF {
     namespace Server{
 
@@ -166,6 +167,38 @@ namespace MF {
             loopManager->removeChannel(channel);
         }
 
+        void MyServant::registerServant() {
+            auto proxy = Client::MyCommunicator::GetInstance()
+                    ->getServantProxy<Route::MyRouteProxy>(routeServantName);
+            if (proxy == nullptr) {
+                LOG(ERROR) << "cant find proxy, routeName: " << routeServantName << std::endl;
+                return;
+            }
+            auto req = std::unique_ptr<RegisterReq>(new RegisterReq());
+            req->set_version(config.version);
+            req->mutable_nodeinfo()->set_host(config.host);
+            req->mutable_nodeinfo()->set_port(config.port);
+            req->mutable_nodeinfo()->set_servername("");
+            req->mutable_nodeinfo()->set_servantname(config.name);
+            req->mutable_nodeinfo()->set_status(kNodeStatusOnline);
+            auto rsp = proxy->registerServant(std::move(req));
+            if (rsp == nullptr) {
+                LOG(ERROR) << "register servant fail, name: " << config.name
+                          << ", host: " << config.host
+                          << ", port: " << config.port << std::endl;
+                return;
+            }
+
+            //注册成功
+            LOG(INFO) << "register servant success, name: " << config.name
+                       << ", host: " << config.host
+                       << ", port: " << config.port
+                       << ", code: " << rsp->code()
+                       << ", nodeId: " << rsp->nodeid()
+                       << std::endl;
+
+        }
+
         int32_t MyTcpServant::startServant() {
             std::string host = config.host;
             uint16_t port = config.port;
@@ -200,6 +233,8 @@ namespace MF {
                     std::bind(&MyTcpServant::onAccept, this, std::placeholders::_1), socket->getfd(), EV_READ);
             loop->add(readWatcher);
 
+            //5. 上报节点
+            registerServant();
             return 0;
         }
 
@@ -322,6 +357,9 @@ namespace MF {
             readWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyIOWatcher>(
                     std::bind(&MyUdpServant::onRead, this, std::placeholders::_1), socket->getfd(), EV_READ);
             loop->add(readWatcher);
+
+            //4. 注册节点
+
 
             return 0;
         }

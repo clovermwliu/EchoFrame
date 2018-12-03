@@ -29,18 +29,20 @@ namespace MF {
              * 编码
              * @param payload payload
              */
-            std::unique_ptr<Buffer::MyIOBuf> encode();
+            virtual std::unique_ptr<Buffer::MyIOBuf> encode();
 
             /**
              * 解码消息
              * @param payload payload
              */
-            void decode(const std::unique_ptr<Buffer::MyIOBuf>& payload);
+            virtual void decode(const std::unique_ptr<Buffer::MyIOBuf>& payload);
 
-            uint32_t headLen() const {
-                return sizeof(length) + sizeof(version)
-                       + sizeof(isRequest) + sizeof(requestId)
-                       + sizeof(serverNumber);
+            virtual uint32_t headLen() const {
+                return sizeof(length)
+                    + sizeof(version)
+                    + sizeof(isRequest)
+                    + sizeof(requestId)
+                    + sizeof(serverNumber);
             }
 
             uint32_t getLength() const;
@@ -95,6 +97,7 @@ namespace MF {
 
             std::unique_ptr<Buffer::MyIOBuf> payload; //数据包
         };
+
     }
 }
 

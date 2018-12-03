@@ -15,17 +15,17 @@
 namespace MF {
     namespace Client{
 
-        class MyBaseRequest : public std::enable_shared_from_this<MyBaseRequest>{
+        class MyBaseSession: public std::enable_shared_from_this<MyBaseSession>{
         public:
             /**
              * 构造函数
              */
-            MyBaseRequest() = default;
+            MyBaseSession() = default;
 
             /**
              * 析构函数
              */
-            virtual ~MyBaseRequest() = default;
+            virtual ~MyBaseSession() = default;
 
             uint64_t getRequestId() const {
                 return requestId;
@@ -56,19 +56,19 @@ namespace MF {
          * 用于记录一次客户端的调用请求
          */
         template<typename REQ, typename RSP>
-        class MyRequest : public MyBaseRequest {
+        class MySession: public MyBaseSession {
         public:
 
             //Session中需要记录的参数
             using SuccessAction = std::function<int32_t (
-                    const std::unique_ptr<RSP>&, const std::shared_ptr<MyRequest<REQ,RSP>>&)>;
+                    const std::unique_ptr<RSP>&, const std::shared_ptr<MySession<REQ,RSP>>&)>;
 
             using FailAction = std::function<int32_t (
-                    const std::shared_ptr<MyRequest<REQ,RSP>>&)>;
+                    const std::shared_ptr<MySession<REQ,RSP>>&)>;
 
-            MyRequest(std::weak_ptr<MyClient> client);
+            MySession(std::weak_ptr<MyClient> client);
 
-            virtual ~MyRequest();
+            virtual ~MySession();
 
             /**
             * 请求完成后需要做的事情
@@ -77,7 +77,7 @@ namespace MF {
             * @return proxy自身
             */
             template<typename Pred, typename... Args>
-            MyRequest<REQ, RSP>& then(Pred&& pred, Args... args) {
+            MySession<REQ, RSP>& then(Pred&& pred, Args... args) {
                 this->thenAction = std::bind(pred, std::placeholders::_1, std::placeholders::_2, args...);
                 return *this;
             }
@@ -89,7 +89,7 @@ namespace MF {
              * @return proxy自生
              */
             template<typename Pred, typename... Args>
-            MyRequest<REQ, RSP>& timeout(Pred&& pred, Args... args) {
+            MySession<REQ, RSP>& timeout(Pred&& pred, Args... args) {
                 this->timeoutAction = std::bind(pred, std::placeholders::_1, args...);
                 return *this;
             }
@@ -101,7 +101,7 @@ namespace MF {
              * @return proxy自生
              */
             template<typename Pred, typename... Args>
-            MyRequest<REQ, RSP>& error(Pred&& pred, Args... args) {
+            MySession<REQ, RSP>& error(Pred&& pred, Args... args) {
                 this->errorAction = std::bind(pred, std::placeholders::_1, args...);
                 return *this;
             }
@@ -152,7 +152,7 @@ namespace MF {
         };
 
         template<typename REQ, typename RSP>
-        MyRequest<REQ, RSP>::MyRequest(std::weak_ptr<MF::Client::MyClient> client) : MyBaseRequest() {
+        MySession<REQ, RSP>::MySession(std::weak_ptr<MF::Client::MyClient> client) : MyBaseSession() {
             this->client = client;
             auto c = this->client.lock();
             if (c != nullptr) {
@@ -161,7 +161,7 @@ namespace MF {
         }
 
         template<typename REQ, typename RSP>
-        void MyRequest<REQ, RSP>::execute() {
+        void MySession<REQ, RSP>::execute() {
             auto c = client.lock();
             if (c == nullptr) {
                 LOG(ERROR) << "connection closed" << std::endl;
@@ -178,9 +178,9 @@ namespace MF {
                       << ", requestId: " << getRequestId() << std::endl;
 
             //增加定时器用于检查是否超时
-            auto self = std::weak_ptr<MyBaseRequest>(shared_from_this());
-            c->whenRequestTimeout(std::bind([self]() -> void {
-                auto s = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(self.lock());
+            auto self = std::weak_ptr<MyBaseSession>(shared_from_this());
+            c->whenSessionTimeout(std::bind([self]() -> void {
+                auto s = std::dynamic_pointer_cast<MySession<REQ, RSP>>(self.lock());
                 if (s != nullptr) {
                     s->doTimeoutAction();
                 }
@@ -188,7 +188,7 @@ namespace MF {
         }
 
         template <typename REQ, typename RSP>
-        std::unique_ptr<RSP> MyRequest<REQ, RSP>::executeAndWait() {
+        std::unique_ptr<RSP> MySession<REQ, RSP>::executeAndWait() {
             isAsync = false; //设置为同步
             //发送数据
             auto c = client.lock();
@@ -228,35 +228,35 @@ namespace MF {
         }
 
         template<typename REQ, typename RSP>
-        MyRequest<REQ, RSP>::~MyRequest() {
+        MySession<REQ, RSP>::~MySession() {
             if (timeoutWatcher != nullptr) {
                 EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
             }
         }
 
         template<typename REQ, typename RSP>
-        void MyRequest<REQ, RSP>::setTimeoutWatcher(EV::MyTimerWatcher *timeoutWatcher) {
+        void MySession<REQ, RSP>::setTimeoutWatcher(EV::MyTimerWatcher *timeoutWatcher) {
             this->timeoutWatcher = timeoutWatcher;
         }
 
         template<typename REQ, typename RSP>
-        const std::unique_ptr<Buffer::MyIOBuf> &MyRequest<REQ, RSP>::getRequest() const {
+        const std::unique_ptr<Buffer::MyIOBuf> &MySession<REQ, RSP>::getRequest() const {
             return request;
         }
 
         template<typename REQ, typename RSP>
-        void MyRequest<REQ, RSP>::setRequest(std::unique_ptr<Protocol::MyMagicMessage> request) {
+        void MySession<REQ, RSP>::setRequest(std::unique_ptr<Protocol::MyMagicMessage> request) {
             this->request = std::move(request);
         }
 
         template<typename REQ, typename RSP>
-        int32_t MyRequest<REQ, RSP>::doSuccessAction(std::unique_ptr<Protocol::MyMessage> response) {
+        int32_t MySession<REQ, RSP>::doSuccessAction(std::unique_ptr<Protocol::MyMessage> response) {
             int32_t rv = kClientResultSuccess;
             this->response = std::unique_ptr<REQ>((REQ*)(response.release()));
             if (isAsync) {
                 //异步
                 if (thenAction) {
-                    auto self = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(shared_from_this());
+                    auto self = std::dynamic_pointer_cast<MySession<REQ, RSP>>(shared_from_this());
                     rv = thenAction(this->response, self);
                 }
             } else {
@@ -268,12 +268,12 @@ namespace MF {
         }
 
         template<typename REQ, typename RSP>
-        int32_t MyRequest<REQ, RSP>::doTimeoutAction() {
+        int32_t MySession<REQ, RSP>::doTimeoutAction() {
             int32_t rv = kClientResultSuccess;
             if (isAsync) {
                 //异步
                 if (timeoutAction) {
-                    auto self = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(shared_from_this());
+                    auto self = std::dynamic_pointer_cast<MySession<REQ, RSP>>(shared_from_this());
                     rv = timeoutAction(self);
                 }
             } else {
@@ -285,12 +285,12 @@ namespace MF {
         }
 
         template<typename REQ, typename RSP>
-        int32_t MyRequest<REQ, RSP>::doErrorAction() {
+        int32_t MySession<REQ, RSP>::doErrorAction() {
             int32_t rv = kClientResultSuccess;
             if (isAsync) {
                 //异步
                 if (errorAction) {
-                    auto self = std::dynamic_pointer_cast<MyRequest<REQ, RSP>>(shared_from_this());
+                    auto self = std::dynamic_pointer_cast<MySession<REQ, RSP>>(shared_from_this());
                     rv = errorAction(self);
                 }
             } else {

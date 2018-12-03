@@ -4,7 +4,7 @@
 
 #include "net/client/MyClient.h"
 #include "net/client/ClientLoop.h"
-#include "net/client/MyRequest.h"
+#include "net/client/MySession.h"
 
 namespace MF {
     namespace Client{
@@ -13,7 +13,7 @@ namespace MF {
          * 增加request
          * @param request request
          */
-        void MyClient::addRequest(const std::shared_ptr<MyBaseRequest>& request ) {
+        void MyClient::addSession(const std::shared_ptr<MyBaseSession> &request) {
             requests[request->getRequestId()] = request;
         }
 
@@ -21,7 +21,7 @@ namespace MF {
          * 删除一个request
          * @param request request
          */
-        void MyClient::removeRequest(uint64_t requestId) {
+        void MyClient::removeSession(uint64_t requestId) {
             requests.erase(requestId);
         }
 
@@ -30,7 +30,7 @@ namespace MF {
          * @param requestId requestId
          * @return request
          */
-        std::shared_ptr<MyBaseRequest> MyClient::findRequest(uint64_t requestId) {
+        std::shared_ptr<MyBaseSession> MyClient::findSession(uint64_t requestId) {
             return requests.find(requestId) != requests.end() ? requests[requestId] : nullptr;
         }
 
@@ -41,14 +41,14 @@ namespace MF {
             return iobuf;
         }
 
-        void MyClient::whenRequestTimeout(std::function<void()> &&pred, uint64_t requestId) {
+        void MyClient::whenSessionTimeout(std::function<void()> &&pred, uint64_t requestId) {
             auto self = std::weak_ptr<MyClient>(shared_from_this());
             auto func = [pred, requestId, self] (EV::MyTimerWatcher*) {
                 pred(); //执行代码
                 //删除request
                 auto s = self.lock();
                 if (s != nullptr) {
-                    s->removeRequest(requestId);
+                    s->removeSession(requestId);
                 }
             };
 

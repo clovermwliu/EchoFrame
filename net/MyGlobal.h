@@ -26,11 +26,11 @@ namespace MF {
         kHandleResultInternalServerError = 101, //Server错误
     }HandleResult;
 
-    typedef enum enumClientReuslt : int32_t  {
+    typedef enum enumClientResult : int32_t  {
         kClientResultSuccess = 0, //成功
         kClientResultTimeout = 1, //超时
         kClientResultFail = 100, //失败
-    };
+    }ClientResult;
 
     //socket相关
     const uint32_t g_default_listen_backlog = 10; //默认等待链接数

@@ -24,14 +24,6 @@ namespace MF {
         }
 
         void MyMagicMessage::decode(const std::unique_ptr<MF::Buffer::MyIOBuf> &payload) {
-            length = payload->read<uint32_t >();
-            version = payload->read<uint16_t >();
-            isRequest = payload->read<int8_t >();
-            requestId = payload->read<uint64_t >();
-            serverNumber = payload->read<uint32_t >();
-
-            this->payload = Buffer::MyIOBuf::create(length - headLen());
-            this->payload->write<void*>(payload->readable(), payload->getReadableLength());
         }
 
         uint32_t MyMagicMessage::getLength() const {
@@ -97,6 +89,7 @@ namespace MF {
             uint32_t packetLen = getPacketLength(buf, length);
             return packetLen <= length ? kPacketStatusComplete : kPacketStatusIncomplete;
         }
+
     }
 }
 
