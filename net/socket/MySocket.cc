@@ -22,6 +22,7 @@ namespace MF {
             this->domain = domain;
             this->type = type;
             this->protocol = protocol;
+            this->isConnected = type == SOCK_DGRAM && fd > 0 ; //udp的话，直接标识未连接成功
             return fd > 0 ? 0 : -1;
         }
 

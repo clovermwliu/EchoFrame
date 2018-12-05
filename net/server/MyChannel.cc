@@ -60,9 +60,12 @@ namespace MF {
         void MyChannel::resetTimer(uint32_t timeout) {
             if (MyTimeProvider::now() - lastReceiveTime >= 1) {
                 //1 秒才修改一次定时器
+                LOG(INFO) << "reset timer, timeout: " << timeout << std::endl;
                 timeoutWatcher->stop();
                 timeoutWatcher->set(timeout, 0);
                 timeoutWatcher->start();
+            } else {
+                LOG(INFO) << "now: " << MyTimeProvider::now() << ", lastReceiveTime: " << lastReceiveTime << std::endl;
             }
         }
 

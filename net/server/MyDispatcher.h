@@ -34,13 +34,13 @@ namespace MF {
              * 处理链接超时
              * @param context 上下文
              */
-            virtual int32_t handleTimeout(std::shared_ptr<MyContext> context) {}
+            virtual int32_t handleTimeout(std::shared_ptr<MyContext> context) {return kHandleResultSuccess;}
 
             /**
              * 处理对端关闭连接
              * @param context context
              */
-            virtual int32_t handleClose(std::shared_ptr<MyContext> context) {}
+            virtual int32_t handleClose(std::shared_ptr<MyContext> context) {return kHandleResultSuccess;}
 
             /**
              * 数据包是否完整

@@ -46,7 +46,17 @@ int main(int argc, const char * argv[]) {
     clientConfig.timeout = 3;
     clientConfig.autoReconnect = true;
     clientConfig.clientType = kClientTypeUdp;
+    clientConfig.heartbeatInterval = 5;
     std::vector<ClientConfig> clientConfigs;
+//    clientConfigs.push_back(clientConfig);
+
+    //tcp client
+    clientConfig.host = "0.0.0.0";
+    clientConfig.port = 8888;
+    clientConfig.timeout = 3;
+    clientConfig.autoReconnect = true;
+    clientConfig.clientType = kClientTypeTcp;
+    clientConfig.heartbeatInterval = 5;
     clientConfigs.push_back(clientConfig);
     MyCommunicator::GetInstance()->update(servantName, clientConfigs);
 
@@ -56,21 +66,22 @@ int main(int argc, const char * argv[]) {
     //从控制台读取数据
     std::string line;
     while(true) {
-        std::string line;
-        std::getline(std::cin, line);
-        LOG(INFO) << "read line: " << line << std::endl;
-        if (!line.empty()) {
-            std::string cmd = line.substr(0, line.find(' '));
-            std::string msg = line.substr(line.find(' ') + 1);
-
-            if (cmd == "username") {
-                LOG(INFO) << proxy->setUsername(msg) << std::endl;
-            } else if (cmd == "password") {
-                LOG(INFO) << proxy->setPassword(msg) << std::endl;
-            } else if (cmd == "quit") {
-                proxy->quit();
-            }
-        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+//        std::string line;
+//        std::getline(std::cin, line);
+//        LOG(INFO) << "read line: " << line << std::endl;
+//        if (!line.empty()) {
+//            std::string cmd = line.substr(0, line.find(' '));
+//            std::string msg = line.substr(line.find(' ') + 1);
+//
+//            if (cmd == "username") {
+//                LOG(INFO) << proxy->setUsername(msg) << std::endl;
+//            } else if (cmd == "password") {
+//                LOG(INFO) << proxy->setPassword(msg) << std::endl;
+//            } else if (cmd == "quit") {
+//                proxy->quit();
+//            }
+//        }
     }
 
     return 0;

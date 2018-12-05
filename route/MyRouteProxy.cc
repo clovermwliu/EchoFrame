@@ -68,13 +68,13 @@ namespace MF {
         std::unique_ptr<Protocol::MyMessage> MyRouteProxy::decode(const std::unique_ptr<Buffer::MyIOBuf> &iobuf) {
             MyRouteMessage* m = nullptr;
             //1. 解析前4个字节
-            uint32_t cmd = iobuf->read<uint32_t >();
+            uint32_t cmd = iobuf->peek<uint32_t >();
             if (cmd == kCommandCodeRegister) {
-                m = MyRouteMessage::decode<RegisterReq>(iobuf);
+                m = MyRouteMessage::decode<RegisterRsp>(iobuf);
             } else if (cmd == kCommandCodeOperate) {
-                m = MyRouteMessage::decode<OperateReq>(iobuf);
+                m = MyRouteMessage::decode<OperateRsp>(iobuf);
             } else if (cmd == kCommandCodePullTable) {
-                m = MyRouteMessage::decode<PullTableReq>(iobuf);
+                m = MyRouteMessage::decode<PullTableRsp>(iobuf);
             } else if (cmd == kCommandCodeHeartBeat) {
                 m = MyRouteMessage::decode<Heartbeat>(iobuf);
             }

@@ -10,6 +10,9 @@
 
 namespace MF{
     namespace Client{
+
+        //线程空闲时做的事情
+        typedef std::function<void ()> IdleFunc;
         /**
          * client的事件循环线程
          */
@@ -61,11 +64,12 @@ namespace MF{
             void removeClient(std::shared_ptr<MyClient> client);
 
         protected:
-            void onIdle() override;
+            bool onIdle() override;
 
         protected:
             //map<servantName, proxy>
             std::map<uint32_t , std::shared_ptr<MyClient>> clients; //所有的proxy
+            uint32_t lastCheckTime; //上一次check的时间
         };
 
         class ClientLoopManager {

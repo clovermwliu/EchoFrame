@@ -10,6 +10,11 @@
 
 namespace MF {
     namespace Protocol {
+
+        enum enumFlag : uint8_t  {
+            kFlagData = 0, //数据
+            kFlagHeartbeat = 1, //心跳
+        };
         /**
          * 消息的基类
          */
@@ -39,15 +44,24 @@ namespace MF {
 
             virtual uint32_t headLen() const {
                 return sizeof(length)
+                    + sizeof(flag)
                     + sizeof(version)
                     + sizeof(isRequest)
                     + sizeof(requestId)
                     + sizeof(serverNumber);
             }
 
+            bool isHeartbeat() const {
+                return flag == kFlagHeartbeat;
+            }
+
             uint32_t getLength() const;
 
             void setLength(uint32_t length);
+
+            uint8_t getFlag() const;
+
+            void setFlag(uint8_t flag);
 
             uint16_t getVersion() const;
 
@@ -91,6 +105,7 @@ namespace MF {
         protected:
             uint32_t length; //消息的总长度
             uint16_t version; //协议版本
+            uint8_t flag; //标志位
             int8_t isRequest; //是否请求
             uint64_t requestId; //请求id
             uint32_t serverNumber; //server number

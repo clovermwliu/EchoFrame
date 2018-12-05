@@ -33,6 +33,8 @@ namespace MF {
                 std::thread t([loop]() {
                     loop->start();
                 });
+                //保存线程id
+                loop->setThreadId(t.get_id());
 
                 std::unique_lock<std::mutex> lock(mutex_);
                 if(!cond_.wait_for(lock, std::chrono::seconds(3), [&t]{return t.joinable();})) {

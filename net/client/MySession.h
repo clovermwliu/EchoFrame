@@ -15,6 +15,10 @@
 namespace MF {
     namespace Client{
 
+        //申明
+        template<typename REQ, typename RSP>
+        class MySession;
+
         class MyBaseSession: public std::enable_shared_from_this<MyBaseSession>{
         public:
             /**
@@ -52,6 +56,176 @@ namespace MF {
             uint64_t requestId; //请求id
         };
 
+        ////////////////////////////////////////////////////////////////////////////////////////////////
+        /**
+         * 心跳会话
+         */
+        template<>
+        class MySession<void, void>: public MyBaseSession {
+        public:
+            //action
+            using Action = std::function<int32_t (const std::shared_ptr<MySession<void, void>>&)>;
+
+            MySession(std::weak_ptr<MyClient> client) {
+                this->client = client;
+                auto c = this->client.lock();
+                if (c != nullptr) {
+                    this->requestId = (static_cast<uint64_t >(c->getUid()) << 32) | MyTimeProvider::now();
+                }
+            }
+
+            ~MySession() {
+                if (timeoutWatcher != nullptr) {
+                    EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
+                }
+            }
+
+            /**
+            * 请求完成后需要做的事情
+            * @param pred 需要做的事情
+            * @param args 调用的参数
+            * @return proxy自身
+            */
+            template<typename Pred, typename... Args>
+            MySession<void, void>* then(Pred&& pred, Args... args) {
+                this->thenAction = std::bind(pred, std::placeholders::_1, args...);
+                return this;
+            }
+
+            /**
+             * 超时之后要做的事情
+             * @param pred 需要调用的函数
+             * @param args 参数列表
+             * @return proxy自生
+             */
+            template<typename Pred, typename... Args>
+            MySession<void, void>* timeout(Pred&& pred, Args... args) {
+                this->timeoutAction = std::bind(pred, std::placeholders::_1, args...);
+                return this;
+            }
+
+            /**
+             * 失败之后要做的事情
+             * @param pred 需要调用的函数
+             * @param args 参数列表
+             * @return proxy自生
+             */
+            template<typename Pred, typename... Args>
+            MySession<void, void>* error(Pred&& pred, Args... args) {
+                this->errorAction = std::bind(pred, std::placeholders::_1, args...);
+                return this;
+            }
+
+            /**
+             * 设置request
+             * @param request request
+             */
+            void setRequest(std::unique_ptr<Protocol::MyMagicMessage> request) {
+                this->request = std::move(request);
+            }
+
+            /**
+             * 发送数据
+             */
+            void execute() {
+                auto c = client.lock();
+                if (c == nullptr) {
+                    LOG(ERROR) << "connection closed" << std::endl;
+                    return ;
+                }
+                auto r = request->encode();
+                if(c->sendPayload(std::move(r)) != 0) {
+                    LOG(ERROR) << "send request fail, uid: " << c->getUid()
+                               << ", requestId: " << getRequestId() << std::endl;
+                    return;
+                }
+
+                LOG(INFO) << "send request success, uid: " << c->getUid()
+                          << ", requestId: " << getRequestId() << std::endl;
+
+                //增加定时器用于检查是否超时
+                auto self = std::weak_ptr<MyBaseSession>(shared_from_this());
+                c->whenSessionTimeout(std::bind([self]() -> void {
+                    auto s = std::dynamic_pointer_cast<MySession<void, void>>(self.lock());
+                    if (s != nullptr) {
+                        s->doTimeoutAction();
+                    }
+                }), this->requestId);
+            }
+
+            /**
+             * 设置超时watcher
+             * @param timeoutWatcher
+             */
+            void setTimeoutWatcher(EV::MyTimerWatcher *timeoutWatcher) {
+                this->timeoutWatcher = timeoutWatcher;
+            }
+
+            int32_t doSuccessAction(std::unique_ptr<Protocol::MyMessage> response) override {
+                int32_t rv = kClientResultSuccess;
+                if (isAsync) {
+                    //异步
+                    if (thenAction) {
+                        auto self = std::dynamic_pointer_cast<MySession<void, void>>(shared_from_this());
+                        rv = thenAction(self);
+                    }
+                } else {
+                    //同步, 发送通知
+                    promise.set_value(kClientResultSuccess);
+                }
+
+                return rv;
+            }
+
+            int32_t doTimeoutAction() override {
+                int32_t rv = kClientResultSuccess;
+                if (isAsync) {
+                    //异步
+                    if (timeoutAction) {
+                        auto self = std::dynamic_pointer_cast<MySession<void, void>>(shared_from_this());
+                        rv = timeoutAction(self);
+                    }
+                } else {
+                    //同步, 发送通知
+                    promise.set_value(kClientResultTimeout);
+                }
+
+                return rv;
+            }
+
+            int32_t doErrorAction() override {
+                int32_t rv = kClientResultSuccess;
+                if (isAsync) {
+                    //异步
+                    if (errorAction) {
+                        auto self = std::dynamic_pointer_cast<MySession<void, void>>(shared_from_this());
+                        rv = errorAction(self);
+                    }
+                } else {
+                    //同步, 发送通知
+                    promise.set_value(kClientResultFail);
+                }
+
+                return rv;
+            }
+
+        protected:
+            Action thenAction; //成功回调
+            Action timeoutAction; //超时回调
+            Action errorAction; //错误回调
+
+            std::weak_ptr<MyClient> client; //客户端指针
+
+            std::unique_ptr<Protocol::MyMagicMessage> request; //请求内容, 包含头信息
+
+            EV::MyTimerWatcher* timeoutWatcher {nullptr}; //超时watcher
+
+            bool isAsync{true}; //是否异步
+
+            std::promise<int32_t > promise; //返回的响应
+        };
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////
         /**
          * 用于记录一次客户端的调用请求
          */
@@ -77,9 +251,9 @@ namespace MF {
             * @return proxy自身
             */
             template<typename Pred, typename... Args>
-            MySession<REQ, RSP>& then(Pred&& pred, Args... args) {
+            MySession<REQ, RSP>* then(Pred&& pred, Args... args) {
                 this->thenAction = std::bind(pred, std::placeholders::_1, std::placeholders::_2, args...);
-                return *this;
+                return this;
             }
 
             /**
@@ -89,9 +263,9 @@ namespace MF {
              * @return proxy自生
              */
             template<typename Pred, typename... Args>
-            MySession<REQ, RSP>& timeout(Pred&& pred, Args... args) {
+            MySession<REQ, RSP>* timeout(Pred&& pred, Args... args) {
                 this->timeoutAction = std::bind(pred, std::placeholders::_1, args...);
-                return *this;
+                return this;
             }
 
             /**
@@ -101,9 +275,9 @@ namespace MF {
              * @return proxy自生
              */
             template<typename Pred, typename... Args>
-            MySession<REQ, RSP>& error(Pred&& pred, Args... args) {
+            MySession<REQ, RSP>* error(Pred&& pred, Args... args) {
                 this->errorAction = std::bind(pred, std::placeholders::_1, args...);
-                return *this;
+                return this;
             }
 
             /**

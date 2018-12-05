@@ -147,7 +147,14 @@ namespace MF {
              *  @return 读取到的值
              */
             template<typename T> BASIC_TYPE(T) read();
-            
+
+            /**
+             * peek一个基本类型
+             * @tparam T 类型
+             * @return 数据
+             */
+            template<typename T> BASIC_TYPE(T) peek();
+
             /**
              *  @brief 读取数据
              *
@@ -219,6 +226,18 @@ namespace MF {
                 throw MyException(std::string("[") + std::string(__FILE__) + ":" + MyCommon::tostr(__LINE__) + "] SkBuffer overflow", 0);
             }
             
+            //2. 读取数据
+            return MyReader<T>::read(buf);
+        }
+
+        template<typename T> BASIC_TYPE(T) MyIOBuf::peek() {
+            //1. 先获取类型长度
+            uint32_t length = sizeof(T);
+            void* buf = buffer_->readable(&length);
+            if (!buf || length < sizeof(T)) { //长度不够
+                throw MyException(std::string("[") + std::string(__FILE__) + ":" + MyCommon::tostr(__LINE__) + "] SkBuffer overflow", 0);
+            }
+
             //2. 读取数据
             return MyReader<T>::read(buf);
         }

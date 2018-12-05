@@ -27,7 +27,6 @@ namespace MF {
             }
 
             virtual ~MyRouteMessage() {
-                LOG(INFO) << "~MyRouteMessage, this: " << this << std::endl;
             }
 
             /*

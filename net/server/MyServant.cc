@@ -37,8 +37,6 @@ namespace MF {
             //读取数据并处理
             auto channel = doRead(watcher);
             if (channel != nullptr) {
-                //有数据到到达了，重新设置超时定时器
-                channel->resetTimer(config.timeout);
                 handlePackets(channel);
             }
         }
@@ -174,29 +172,35 @@ namespace MF {
                 LOG(ERROR) << "cant find proxy, routeName: " << routeServantName << std::endl;
                 return;
             }
-            auto req = std::unique_ptr<RegisterReq>(new RegisterReq());
-            req->set_version(config.version);
-            req->mutable_nodeinfo()->set_host(config.host);
-            req->mutable_nodeinfo()->set_port(config.port);
-            req->mutable_nodeinfo()->set_servername("");
-            req->mutable_nodeinfo()->set_servantname(config.name);
-            req->mutable_nodeinfo()->set_status(kNodeStatusOnline);
-            auto rsp = proxy->registerServant(std::move(req));
-            if (rsp == nullptr) {
-                LOG(ERROR) << "register servant fail, name: " << config.name
-                          << ", host: " << config.host
-                          << ", port: " << config.port << std::endl;
-                return;
-            }
+            auto wp = std::weak_ptr<Route::MyRouteProxy>(proxy);
+            proxy->runAfterConnected([wp, this] () -> void {
+                LOG(INFO) << "start register servant" << std::endl;
+                auto proxy = wp.lock();
+                if (proxy != nullptr) {
+                    auto req = std::unique_ptr<RegisterReq>(new RegisterReq());
+                    req->set_version(this->config.version);
+                    req->mutable_nodeinfo()->set_host(this->config.host);
+                    req->mutable_nodeinfo()->set_port(this->config.port);
+                    req->mutable_nodeinfo()->set_servername("");
+                    req->mutable_nodeinfo()->set_servantname(this->config.name);
+                    req->mutable_nodeinfo()->set_status(kNodeStatusOnline);
+                    auto rsp = proxy->registerServant(std::move(req));
+                    if (rsp == nullptr) {
+                        LOG(ERROR) << "register servant fail, name: " << config.name
+                                   << ", host: " << config.host
+                                   << ", port: " << config.port << std::endl;
+                        return;
+                    }
 
-            //注册成功
-            LOG(INFO) << "register servant success, name: " << config.name
-                       << ", host: " << config.host
-                       << ", port: " << config.port
-                       << ", code: " << rsp->code()
-                       << ", nodeId: " << rsp->nodeid()
-                       << std::endl;
-
+                    //注册成功
+                    LOG(INFO) << "register servant success, name: " << config.name
+                              << ", host: " << config.host
+                              << ", port: " << config.port
+                              << ", code: " << rsp->code()
+                              << ", nodeId: " << rsp->nodeid()
+                              << std::endl;
+                }
+            });
         }
 
         int32_t MyTcpServant::startServant() {
@@ -234,7 +238,9 @@ namespace MF {
             loop->add(readWatcher);
 
             //5. 上报节点
-            registerServant();
+            if (this->config.name != this->routeServantName) {
+                registerServant();
+            }
             return 0;
         }
 
@@ -305,6 +311,9 @@ namespace MF {
                 LOG(ERROR) << "find channel fail, uid: " << uid << std::endl;
                 return nullptr;
             }
+
+            //有数据到到达了，重新设置超时定时器
+            channel->resetTimer(config.timeout);
 
             //4. 使用channel读取数据
             auto rv = channel->onRead();
@@ -430,6 +439,9 @@ namespace MF {
                            << ", ip: " << ip << ", port: " << port << std::endl;
                 return nullptr;
             }
+
+            //有数据到到达了，重新设置超时定时器
+            channel->resetTimer(config.timeout);
 
             //4. 读取数据
             int32_t readLen = channel->onRead();

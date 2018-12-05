@@ -28,7 +28,7 @@ using namespace MF::DEMO;
 int main(int argc, const char * argv[]) {
     //初始化client
     CommConfig commConfig;
-    commConfig.handlerThreadCount = 1;
+    commConfig.handlerThreadCount = 2;
     commConfig.ioThreadCount = 1;
     MyCommunicator::GetInstance()->initialize(commConfig);
 

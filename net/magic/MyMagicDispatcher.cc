@@ -24,13 +24,20 @@ namespace MF {
             auto reqMsg = std::move(std::unique_ptr<Protocol::MyMagicMessage>(new Protocol::MyMagicMessage()));
             reqMsg->decode(request);
 
+            //检查是否心跳消息
+            if (reqMsg->isHeartbeat()) {
+                LOG(INFO) << "receive heartbeat message, requestId: " << reqMsg->getRequestId() << std::endl;
+                //返回心跳响应
+                reqMsg->setIsRequest(0); //设置为响应
+                response = std::move(reqMsg->encode());
+                return kHandleResultSuccess;
+            }
+
             //2. 分发数据
             std::unique_ptr<Buffer::MyIOBuf> rspBuf;
             auto rv = dispatchPayload(reqMsg->getPayload(), rspBuf, context);
             if (rv != kHandleResultSuccess) {
-                LOG(ERROR) << "dispatch payload fail, uid: "
-                << context->getChannel()->getUid()
-                << ", requestId: " << reqMsg->getRequestId() << std::endl;
+                LOG(ERROR) << "dispatch payload fail, requestId: " << reqMsg->getRequestId() << std::endl;
                 return rv;
             }
 

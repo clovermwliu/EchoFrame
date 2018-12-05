@@ -60,8 +60,9 @@ namespace MF {
                 add(queue_watcher_);
                 
                 idle_watcher_ = MyWatcherManager::GetInstance()->create<MyIdleWatcher>([this] (MyWatcher*) {
-                    this->onIdle(); //执行空闲任务
-                    std::this_thread::sleep_for(std::chrono::milliseconds(10)); //休眠10毫秒
+                    if(!this->onIdle()) { //执行空闲任务,如果没有任何任务执行，就休眠10ms
+                        std::this_thread::sleep_for(std::chrono::milliseconds(10)); //休眠10毫秒
+                    }
                 });
                 add(idle_watcher_);
             }
@@ -73,7 +74,14 @@ namespace MF {
                 MyWatcherManager::GetInstance()->destroy(queue_watcher_); //删除watcher
                 MyWatcherManager::GetInstance()->destroy(idle_watcher_);
             }
-            
+
+            /**
+             * 设置线程id
+             */
+            void setThreadId(const std::thread::id &threadId) {
+                MyLoop::threadId = threadId;
+            }
+
             /**
              *  @brief 增加一个watcher
              *
@@ -127,41 +135,19 @@ namespace MF {
              *
              */
             template<typename Pred, class... Args>
-            void RunInThread(Pred&& pred, Args... args) {
-                //放进队列
-                queue_.pushBack(std::bind(pred, args...));
-                {
-                    lock_start
-                    //发出事件信号
-                    queue_watcher_->signal();
+            void RunInThreadOrImmediate(Pred &&pred, Args... args) {
+                if (std::this_thread::get_id() == threadId) {
+                    //立刻执行
+                    pred(args...);
+                } else {
+                    //放进队列
+                    queue_.pushBack(std::bind(pred, args...));
+                    {
+                        lock_start
+                        //发出事件信号
+                        queue_watcher_->signal();
+                    }
                 }
-            }
-            
-            /**
-             *  @brief 执行某个函数并且等待
-             *
-             *  @param pred    需要执行的函数
-             *
-             */
-            template<typename Pred, class... Args>
-            void RunInThreadAndWait(Pred&& pred, Args... args) {
-                std::mutex m;
-                std::condition_variable c;
-                bool ready = false;
-                auto func = [&m, &c, pred, &ready] () {
-                    std::lock_guard<std::mutex> guard(m);
-                    ready = true;
-                    pred();
-                    c.notify_one();
-                };
-
-                queue_.pushBack(std::bind(pred, args...)); //添加包裹之后的函数
-                {
-                    lock_start
-                    queue_watcher_->signal(); //唤醒evloop
-                }
-                std::unique_lock<std::mutex> lock(m);
-                c.wait(lock,[&ready]{return ready;});
             }
             
             /**
@@ -211,7 +197,7 @@ namespace MF {
             /**
              * 当前线程空闲
              */
-            virtual void onIdle() {}
+            virtual bool onIdle() { return false;}
 
         protected:
             MyLoop(MyLoop& r) = delete; //不允许拷贝
@@ -223,6 +209,8 @@ namespace MF {
             MyIdleWatcher* idle_watcher_; //空闲的watcher
             bool exit_ {false}; //退出循环
             std::mutex mutex_;
+
+            std::thread::id threadId; //线程id
         };
     }
 }

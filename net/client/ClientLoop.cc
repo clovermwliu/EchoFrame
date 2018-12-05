@@ -42,8 +42,16 @@ namespace MF {
             clients.erase(client->getUid());
         }
 
-        void ClientLoop::onIdle() {
+        bool ClientLoop::onIdle() {
+            if (MyTimeProvider::now() - lastCheckTime < 1) { //1秒检查一次
+                return false;
+            }
             //检查是否有链接断开了
+            for(auto it = clients.begin(); it != clients.end(); ++it) {
+                it->second->onHeartbeat(); //处理心跳
+            }
+            lastCheckTime = MyTimeProvider::now();
+            return true;
         }
 
         ClientLoopManager::~ClientLoopManager() {
@@ -72,6 +80,9 @@ namespace MF {
                std::thread t([loop]() {
                    loop->start();
                });
+
+               //设置线程id
+               loop->setThreadId(t.get_id());
 
                std::unique_lock<std::mutex> lock(mutex_);
                if(!cond_.wait_for(lock, std::chrono::seconds(3), [&t]{return t.joinable();})) {

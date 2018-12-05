@@ -55,6 +55,32 @@ namespace MF {
             loop->RunInThreadAfterDelay(func, config.timeout);
         }
 
+        uint32_t MyClient::getLoadAvg() const {
+            return loadAvg;
+        }
+
+        void MyClient::setLoadAvg(uint32_t loadAvg) {
+            MyClient::loadAvg = loadAvg;
+        }
+
+        uint32_t MyClient::getLastHeartbeatTime() const {
+            return lastHeartbeatTime;
+        }
+
+        void MyClient::setLastHeartbeatTime(uint32_t lastHeartbeatTime) {
+            MyClient::lastHeartbeatTime = lastHeartbeatTime;
+        }
+
+        void MyClient::onHeartbeat() {
+            if (heartbeatFunc) {//处理心跳
+                heartbeatFunc(shared_from_this());
+            }
+        }
+
+        void MyClient::setHeartbeatFunc(MyClient::OnHeartbeatFunc&& heartbeatFunc) {
+            MyClient::heartbeatFunc = heartbeatFunc;
+        }
+
         MyTcpClient::MyTcpClient(uint16_t servantId) : MyClient(servantId){
             socket->socket(AF_INET, SOCK_STREAM, 0);
             uid = static_cast<uint32_t >(socket->getfd() << 16 | servantId);
@@ -141,8 +167,8 @@ namespace MF {
 
         int32_t MyTcpClient::sendPayload(const char *buffer, uint32_t length) {
             auto self = shared_from_this();
-            loop->RunInThread([self, buffer, length]() -> void {
-                self->getSocket()->write((void*)buffer, length);
+            loop->RunInThreadOrImmediate([self, buffer, length]() -> void {
+                self->getSocket()->write((void *) buffer, length);
             });
             return 0;
         }
@@ -198,7 +224,7 @@ namespace MF {
         int32_t MyTcpClient::sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) {
             auto self = shared_from_this();
             auto ptr = iobuf.release();
-            loop->RunInThread([self, ptr]() -> void {
+            loop->RunInThreadOrImmediate([self, ptr]() -> void {
                 std::unique_ptr<Buffer::MyIOBuf> tmpBuf(ptr);
                 auto buffer = tmpBuf->readable();
                 auto length = tmpBuf->getReadableLength();
@@ -218,13 +244,24 @@ namespace MF {
         }
 
         int32_t MyUdpClient::connect(const MF::Client::ClientConfig &config, MF::Client::ClientLoop *loop) {
+            return asyncConnect(config, loop, nullptr).get();
+        }
+
+        std::future<int32_t>
+        MyUdpClient::asyncConnect(const ClientConfig &config, ClientLoop *loop, OnConnectFunction &&func) {
             this->config = config; //保存配置
             this->loop = loop; //保存loop
-            this->onConnectFunc = nullptr; //连接成功需要执行的回调
+            this->onConnectFunc = func; //连接成功需要执行的回调
             socket->setNonBlock(); //设置异步
             this->connectTime = MyTimeProvider::now(); //设置连接时间
-//            return socket->connect(config.host, config.port);
-            return 0;
+            //调用onConnect
+            loop->RunInThreadOrImmediate(std::bind(onConnectFunc, shared_from_this()));
+
+            //设置connect promise
+            connectPromise = new std::promise<int32_t >();
+            connectPromise->set_value(0);
+
+            return connectPromise->get_future();
         }
 
         void MyUdpClient::disconnect() {
@@ -243,8 +280,14 @@ namespace MF {
             //断开链接
             disconnect();
 
+            //重新生成socket
+            socket = new Socket::MySocket();
+            if (socket->socket(AF_INET, SOCK_DGRAM, 0) != 0) {
+                LOG(ERROR) << "socket fail" << std::endl;
+            }
+
             //重新链接
-            connect(this->config, this->loop);
+            asyncConnect(this->config, this->loop, std::move(this->onConnectFunc));
         }
 
         int32_t MyUdpClient::onRead() {
@@ -283,7 +326,7 @@ namespace MF {
         int32_t MyUdpClient::sendPayload(std::unique_ptr<MF::Buffer::MyIOBuf> iobuf) {
             auto self = std::dynamic_pointer_cast<MyUdpClient>(shared_from_this());
             auto ptr = iobuf.release();
-            loop->RunInThread([self, ptr]() -> void {
+            loop->RunInThreadOrImmediate([self, ptr]() -> void {
                 std::unique_ptr<Buffer::MyIOBuf> tmpBuf(ptr);
                 auto buffer = tmpBuf->readable();
                 auto length = tmpBuf->getReadableLength();
@@ -292,15 +335,44 @@ namespace MF {
                     LOG(ERROR) << "udp send buffer overflow, max: " << g_max_udp_packet_length << std::endl;
                     return;
                 }
-                if(self->socket->writeTo(self->config.host, self->config.port, buffer, length) <= 0) {
+                if (self->socket->writeTo(self->config.host, self->config.port, buffer, length) <= 0) {
                     EAGAIN;
                     auto err = errno;
                     LOG(ERROR) << "send packet fail, host: " << self->config.host
-                    << ",port: " << self->config.port << ", error: " << strerror(err) << ", err: " << err << std::endl;
+                               << ",port: " << self->config.port << ", error: " << strerror(err) << ", err: " << err
+                               << std::endl;
                 }
             });
 
             return 0;
+        }
+
+        void MyClientSelector::addClient(std::shared_ptr<MF::Client::MyClient> client) {
+            std::lock_guard<std::mutex> guard(mutex);
+            clients[client->getUid()] = client;
+        }
+
+        void MyClientSelector::removeClient(uint64_t uid) {
+            std::lock_guard<std::mutex> guard(mutex);
+            clients.erase(uid);
+        }
+
+        std::shared_ptr<MyClient> MyClientSelector::getClient(uint32_t strategy) {
+            //循环取首个
+            std::shared_ptr<MyClient> c = nullptr;
+            std::lock_guard<std::mutex> guard(mutex);
+            while(!clients.empty()) {
+                auto it = clients.begin();
+                c = it->second.lock();
+                clients.erase(it);
+                if (c != nullptr) {
+                    //重新添加
+                    clients[c->getUid()] = c;
+                    break;
+                }
+            }
+
+            return c;
         }
     }
 }

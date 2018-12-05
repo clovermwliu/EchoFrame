@@ -5,7 +5,7 @@
 #ifndef MYFRAMEWORK2_MYPROXY_H
 #define MYFRAMEWORK2_MYPROXY_H
 
-#include <deque>
+#include <unordered_map>
 #include "net/client/MyClient.h"
 #include "net/client/MySession.h"
 #include "util/MyThreadPool.h"
@@ -26,6 +26,13 @@ namespace MF {
             std::vector<ClientConfig> clients; //client 配置
             uint32_t handlerThreadCount{1}; //handler thread count
         };
+
+        enum ProxyStatus : uint32_t  {
+            kProxyStatusDisconnected = 0,
+            kProxyStatusConnected = 1,
+        };
+
+        typedef std::function<void (std::weak_ptr<MyClient>)> ProxyFunc; //proxy可执行代码
 
         /**
          * 一个proxy管理多个client，指向某个特定服务的集群
@@ -81,10 +88,23 @@ namespace MF {
             virtual int32_t addUdpClient(const ClientConfig& config);
 
             /**
+             * 增加client
+             * @param client client
+             * @return 0 成功 其他失败
+             */
+            int32_t addClient(const MF::Client::ClientConfig &config, std::shared_ptr<MyClient> client);
+
+            /**
              * 获取随机的client
              * @return client
              */
             std::shared_ptr<MyClient> getClient();
+
+            /**
+             * 获取可用的client数量
+             * @return
+             */
+            uint32_t getConnectedClientCount() const;
 
             /**
              * 有数据可读
@@ -95,6 +115,21 @@ namespace MF {
              * 客户端断连
              */
             virtual void onDisconnect(const std::shared_ptr<MyClient>& client);
+
+            /**
+             * 设置proxy已连接
+             */
+            void setConnected(std::weak_ptr<MyClient> client);
+
+            /**
+             * 设置proxy未连接
+             */
+            void setDisconnected();
+
+            /**
+             * 开启心跳
+             */
+            virtual void heartbeat(std::shared_ptr<MyClient> client) = 0;
 
             /**
              * 判断响应包数据是否完整
@@ -112,8 +147,24 @@ namespace MF {
              */
             virtual uint32_t getPacketLength(const char* buf, uint32_t len) = 0;
 
+            /**
+             * proxy中至少一个client连接成功
+             * @param client 链接成功的client
+             */
+            virtual void onConnected(std::weak_ptr<MyClient> client) = 0;
+
+            /**
+             * proxy中所有的client都断开链接了
+             */
+            virtual void onDisconnected() = 0;
+
+            /**
+             * proxy中某一个client链接成功
+             * @param client client
+             */
+            virtual void onClientClosed(std::weak_ptr<MyClient> client) = 0;
         protected:
-            MyThreadQueue<std::weak_ptr<MyClient>> clients; //可以使用的client
+            MyClientSelector selector; //client选择器
 
             ClientLoopManager* loops; //事件循环
 
@@ -122,6 +173,11 @@ namespace MF {
             ProxyConfig config; //proxy的配置
 
             std::hash<std::string> hash;
+
+            uint32_t status {kProxyStatusDisconnected}; //proxy状态
+            ProxyFunc connectedFunc; //连接成功回调
+            ProxyFunc disconnectedFunc; //断连回调
+            ProxyFunc clientClosedFunc; //client断连回调
         };
 
         /**
@@ -155,12 +211,62 @@ namespace MF {
              */
             void update(const ProxyConfig &config) override;
 
+            /**
+             * proxy connected 之后需要做的事情
+             * @tparam Pred pred
+             * @param pred pred
+             */
+            template<typename Pred>
+            void runAfterConnected(Pred&& pred) {
+                connectedFunc = std::bind([pred] (std::weak_ptr<MyClient>) -> void {
+                    pred();
+                }, std::placeholders::_1);
+            }
+
+            /**
+             * proxy disconnected之后需要做的事情
+             * @tparam Pred pred
+             * @param pred pred
+             */
+            template<typename Pred>
+            void runAfterDisconnected(Pred&& pred) {
+                disconnectedFunc = std::bind([pred] (std::weak_ptr<MyClient>) -> void {
+                    pred();
+                }, std::placeholders::_1);
+            }
+
+            /**
+             *
+             * @tparam Pred
+             * @param pred
+             */
+            template<typename Pred>
+            void runAfterClientClosed(Pred&& pred) {
+                clientClosedFunc = std::bind([pred] (std::weak_ptr<MyClient>) -> void {
+                    pred();
+                }, std::placeholders::_1);
+            }
+
         protected:
             /**
              * 发送数据
              */
             template<typename REQ, typename RSP>
             std::shared_ptr<MySession<REQ, RSP>> buildSession(std::unique_ptr<REQ> message);
+
+            /**
+             * 构造心跳session
+             * @return 心跳session
+             */
+            std::shared_ptr<MySession<void, void>> buildHeartbeatSession(std::shared_ptr<MyClient> client);
+
+//            std::shared_ptr<
+
+            /**
+             * 开启心跳
+             * @param client client
+             */
+            void heartbeat(std::shared_ptr<MyClient> client) override;
 
             /**
              * decode 消息
@@ -176,8 +282,24 @@ namespace MF {
              */
             virtual std::unique_ptr<Buffer::MyIOBuf> encode(const std::unique_ptr<Protocol::MyMessage>& message) = 0;
 
+            /**
+             * proxy可用
+             * @param client 可用的client
+             */
+            void onConnected(std::weak_ptr<MyClient> client) override;
+
+            /**
+             * 所有proxy都断开链接了
+             */
+            void onDisconnected() override;
+
+            /**
+             * 某一个客户端断连
+             * @param client
+             */
+            void onClientClosed(std::weak_ptr<MyClient> client) override;
+
         private:
-            void handleMessage(const char* buf, uint32_t len, std::shared_ptr<MyClient> client);
         };
 
         template<typename REQ, typename RSP>
@@ -224,6 +346,7 @@ namespace MF {
             //4. 增加数据包头
             auto magicMsg = std::unique_ptr<Protocol::MyMagicMessage>(new Protocol::MyMagicMessage());
             magicMsg->setLength(magicMsg->headLen() + payload->getReadableLength());
+            magicMsg->setFlag(Protocol::kFlagData);
             magicMsg->setVersion(static_cast<uint16_t >(1)); //TODO: 版本控制
             magicMsg->setIsRequest(static_cast<int8_t >(1));
             magicMsg->setRequestId(session->getRequestId());
@@ -237,6 +360,7 @@ namespace MF {
 
             return session; //返回request
         }
+
     }
 }
 

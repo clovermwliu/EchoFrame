@@ -34,7 +34,7 @@ namespace MF {
             auto c = channel.lock();
             if (c != nullptr && c->getLoop() != nullptr) {
                 auto lp = c->getLoop();
-                lp->RunInThread([lp, c] () -> void {
+                lp->RunInThreadOrImmediate([lp, c]() -> void {
                     lp->removeChannel(c); //删除channel
                 });
             }

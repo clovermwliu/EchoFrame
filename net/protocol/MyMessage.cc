@@ -10,20 +10,32 @@ namespace MF {
         std::unique_ptr<Buffer::MyIOBuf> MyMagicMessage::encode() {
             std::unique_ptr<Buffer::MyIOBuf> payload(Buffer::MyIOBuf::create(length));
             payload->write<uint32_t >(length);
+            payload->write<uint8_t >(flag);
             payload->write<uint16_t >(version);
             payload->write<int8_t >(isRequest);
             payload->write<uint64_t >(requestId);
             payload->write<uint32_t >(serverNumber);
 
             //写入数据体
-            payload->write<void*>(
-                    this->payload->readable()
-                    , this->payload->getReadableLength());
+            if (this->payload != nullptr) {
+                payload->write<void*>(this->payload->readable(), this->payload->getReadableLength());
+            }
 
             return payload;
         }
 
         void MyMagicMessage::decode(const std::unique_ptr<MF::Buffer::MyIOBuf> &payload) {
+            length = payload->read<uint32_t >();
+            flag = payload->read<uint8_t >();
+            version = payload->read<uint16_t >();
+            isRequest = payload->read<int8_t >();
+            requestId = payload->read<uint64_t >();
+            serverNumber = payload->read<uint32_t >();
+
+            if (payload->getReadableLength() > 0) {
+                this->payload = Buffer::MyIOBuf::create(length - headLen());
+                this->payload->write<void*>(payload->readable(), payload->getReadableLength());
+            }
         }
 
         uint32_t MyMagicMessage::getLength() const {
@@ -32,6 +44,14 @@ namespace MF {
 
         void MyMagicMessage::setLength(uint32_t length) {
             MyMagicMessage::length = length;
+        }
+
+        uint8_t MyMagicMessage::getFlag() const {
+            return flag;
+        }
+
+        void MyMagicMessage::setFlag(uint8_t flag) {
+            MyMagicMessage::flag = flag;
         }
 
         uint16_t MyMagicMessage::getVersion() const {
@@ -89,7 +109,6 @@ namespace MF {
             uint32_t packetLen = getPacketLength(buf, length);
             return packetLen <= length ? kPacketStatusComplete : kPacketStatusIncomplete;
         }
-
     }
 }
 

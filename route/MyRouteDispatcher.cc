@@ -8,6 +8,10 @@ namespace MF {
     namespace Route {
 
         MyRouteDispatcher::MyRouteDispatcher() {
+            registerHandler<MyRegisterHandler>(kCommandCodeRegister);
+            registerHandler<MyOperateHandler>(kCommandCodeOperate);
+            registerHandler<MyPullTableHandler>(kCommandCodePullTable);
+            registerHandler<MyHeartbeatHandler>(kCommandCodeHeartBeat);
         }
 
         int32_t MyRouteDispatcher::dispatchPayload(const std::unique_ptr<Buffer::MyIOBuf> &request,
@@ -20,7 +24,6 @@ namespace MF {
             auto handler = findHandler(cmd);
             if (handler == nullptr) {
                 LOG(ERROR) << "find handler fail, cmd: " << cmd << std::endl;
-                context->close(); //关闭连接
                 return kHandleResultPacketInvalid;
             }
 

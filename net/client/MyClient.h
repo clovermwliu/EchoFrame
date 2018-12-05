@@ -10,6 +10,7 @@
 #include "net/socket/MySocket.h"
 #include "net/buffer/myIOBuf.h"
 #include "net/ev/MyWatcher.h"
+#include "util/MyTimeProvider.h"
 
 namespace MF {
 
@@ -38,9 +39,13 @@ namespace MF {
             uint32_t timeout{3};
             int32_t clientType{kClientTypeTcp}; //连接类型
             bool autoReconnect{true}; //自动重连
+            bool needHeartbeat{true}; //是否需要心跳
+            uint32_t heartbeatInterval {30}; //心跳间隔
         };
         class MyClient : public std::enable_shared_from_this<MyClient>{
         public:
+
+            typedef std::function<void (std::shared_ptr<MyClient>)> OnHeartbeatFunc; //心跳处理函数
             /**
              * 构造函数
              */
@@ -60,9 +65,13 @@ namespace MF {
                 if (readBuffer != nullptr) {
                     delete(readBuffer);
                 }
+
+                //重置数据
+                lastHeartbeatTime = 0;
+                loadAvg = 0;
             }
 
-            uint32_t getUid() const {
+            uint64_t getUid() const {
                 return uid;
             }
 
@@ -75,7 +84,7 @@ namespace MF {
             }
 
             uint32_t getServantId() const {
-                return uid & 0xFFFF;
+                return static_cast<uint32_t >(uid & 0xFFFF);
             }
 
             Socket::MySocket *getSocket() const {
@@ -90,8 +99,23 @@ namespace MF {
                 return loop;
             }
 
+            uint32_t getLoadAvg() const;
+
+            void setLoadAvg(uint32_t loadAvg);
+
+            uint32_t getLastHeartbeatTime() const;
+
+            void setHeartbeatFunc(OnHeartbeatFunc&& heartbeatFunc);
+
+            void setLastHeartbeatTime(uint32_t lastHeartbeatTime);
+
+            bool needSendHeartbeat() const {
+                return config.needHeartbeat
+                    && lastHeartbeatTime + config.heartbeatInterval <= MyTimeProvider::now();
+            }
+
             bool connected() const {
-                return socket->connected();
+                return socket != nullptr && socket->connected();
             }
 
             /**
@@ -136,7 +160,7 @@ namespace MF {
              * @return 返回数据
              */
             virtual std::future<int32_t > asyncConnect(
-                    const ClientConfig& config, ClientLoop* loop, OnConnectFunction && func) {}
+                    const ClientConfig& config, ClientLoop* loop, OnConnectFunction && func) = 0;
 
             /**
              * 有数据可以读
@@ -188,6 +212,11 @@ namespace MF {
              * @param pred pred
              */
             void whenSessionTimeout(std::function<void()> &&pred, uint64_t requestId);
+
+            /**
+             * 处理心跳
+             */
+            virtual void onHeartbeat();
         protected:
 
             /**
@@ -216,6 +245,12 @@ namespace MF {
             uint32_t connectTime; //连接开始的时间
 
             OnConnectFunction onConnectFunc; //连接成功需要执行的方法
+
+            uint32_t loadAvg{0}; //连接的平均负载 0-100
+
+            uint32_t lastHeartbeatTime{0}; //上次心跳时间
+
+            OnHeartbeatFunc heartbeatFunc; //心跳处理函数
         };
 
         /**
@@ -254,6 +289,9 @@ namespace MF {
 
             int32_t connect(const ClientConfig &config, ClientLoop* loop) override;
 
+            std::future<int32_t>
+            asyncConnect(const ClientConfig &config, ClientLoop *loop, OnConnectFunction &&func) override;
+
             void disconnect() override;
 
             void reconnect() override;
@@ -265,8 +303,34 @@ namespace MF {
             int32_t sendPayload(std::unique_ptr<Buffer::MyIOBuf> iobuf) override;
 
         protected:
+        };
 
+        /**
+         * client选择器
+         */
+        class MyClientSelector {
+        public:
+            /**
+             * 增加一个client
+             * @param client cient
+             */
+            void addClient(std::shared_ptr<MyClient> client);
 
+            /**
+             * 根据uid删除client
+             * @param uid uid
+             */
+            void removeClient(uint64_t uid);
+
+            /**
+             * 根据策略选择一个client
+             * @param strategy 策略
+             * @return client
+             */
+            std::shared_ptr<MyClient> getClient(uint32_t strategy);
+        private:
+            std::map<uint64_t , std::weak_ptr<MyClient>> clients; //所有的客户端
+            std::mutex mutex; //锁
         };
     }
 }
