@@ -63,6 +63,32 @@ namespace MF {
              */
             void stopServant();
 
+            /**
+             * 注册servant
+             */
+            virtual void registerServant(const std::string& routeServantName);
+
+            /**
+             * 同步servant
+             */
+            virtual void syncServant(const std::string& routeServantName);
+
+            /**
+             * 检查servant是否已经注册
+             * @return 是否已经注册
+             */
+            bool isRegistered() const {
+                return this->registered;
+            }
+
+            /**
+             * 获取上次同步状态的时间
+             * @return 上次同步状态时间
+             */
+            uint32_t getLastSyncTime() const {
+                return lastSyncTime;
+            }
+
         protected:
 
             /**
@@ -106,12 +132,6 @@ namespace MF {
              * @return 对应的channel对象
              */
             virtual std::shared_ptr<MyChannel> doRead(EV::MyWatcher* watcher) = 0;
-
-            /**
-             * 注册servant
-             */
-            virtual void registerServant();
-
         protected:
 
             ServantConfig config; //servant 配置
@@ -126,7 +146,8 @@ namespace MF {
 
             MyThreadExecutor<int32_t >* handlerExecutor; //handler的执行线程池
 
-            std::string routeServantName = "udpRouteServant"; //route servant name
+            bool registered {false}; //是否已经注册
+            uint32_t lastSyncTime {0}; //上次同步时间
         };
 
         /**

@@ -34,6 +34,7 @@ namespace MF {
              */
             std::unique_ptr<Heartbeat> heartbeat(std::unique_ptr<Heartbeat> req);
         protected:
+
             int32_t isPacketComplete(const char *buf, uint32_t len) override;
 
             uint32_t getPacketLength(const char *buf, uint32_t len) override;
@@ -42,6 +43,7 @@ namespace MF {
 
             unique_ptr<Buffer::MyIOBuf> encode(const std::unique_ptr<Protocol::MyMessage> &message) override;
 
+        private:
         };
     }
 }

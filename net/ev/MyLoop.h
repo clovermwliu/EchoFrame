@@ -127,6 +127,10 @@ namespace MF {
                 exit_ = true;
                 queue_watcher_->signal(); //发出通知
             }
+
+            bool exited() const {
+                return exit_;
+            }
             
             /**
              *  @brief 线程执行

@@ -112,19 +112,15 @@ namespace MF {
             virtual void onRead(EV::MyWatcher* watcher);
 
             /**
+             * 客户端连接成功回调
+             * @param client client
+             */
+            virtual void onConnect(std::shared_ptr<MyClient> client) {};
+
+            /**
              * 客户端断连
              */
             virtual void onDisconnect(const std::shared_ptr<MyClient>& client);
-
-            /**
-             * 设置proxy已连接
-             */
-            void setConnected(std::weak_ptr<MyClient> client);
-
-            /**
-             * 设置proxy未连接
-             */
-            void setDisconnected();
 
             /**
              * 开启心跳
@@ -147,22 +143,6 @@ namespace MF {
              */
             virtual uint32_t getPacketLength(const char* buf, uint32_t len) = 0;
 
-            /**
-             * proxy中至少一个client连接成功
-             * @param client 链接成功的client
-             */
-            virtual void onConnected(std::weak_ptr<MyClient> client) = 0;
-
-            /**
-             * proxy中所有的client都断开链接了
-             */
-            virtual void onDisconnected() = 0;
-
-            /**
-             * proxy中某一个client链接成功
-             * @param client client
-             */
-            virtual void onClientClosed(std::weak_ptr<MyClient> client) = 0;
         protected:
             MyClientSelector selector; //client选择器
 
@@ -173,11 +153,6 @@ namespace MF {
             ProxyConfig config; //proxy的配置
 
             std::hash<std::string> hash;
-
-            uint32_t status {kProxyStatusDisconnected}; //proxy状态
-            ProxyFunc connectedFunc; //连接成功回调
-            ProxyFunc disconnectedFunc; //断连回调
-            ProxyFunc clientClosedFunc; //client断连回调
         };
 
         /**
@@ -211,43 +186,14 @@ namespace MF {
              */
             void update(const ProxyConfig &config) override;
 
-            /**
-             * proxy connected 之后需要做的事情
-             * @tparam Pred pred
-             * @param pred pred
-             */
-            template<typename Pred>
-            void runAfterConnected(Pred&& pred) {
-                connectedFunc = std::bind([pred] (std::weak_ptr<MyClient>) -> void {
-                    pred();
-                }, std::placeholders::_1);
-            }
-
-            /**
-             * proxy disconnected之后需要做的事情
-             * @tparam Pred pred
-             * @param pred pred
-             */
-            template<typename Pred>
-            void runAfterDisconnected(Pred&& pred) {
-                disconnectedFunc = std::bind([pred] (std::weak_ptr<MyClient>) -> void {
-                    pred();
-                }, std::placeholders::_1);
-            }
-
-            /**
-             *
-             * @tparam Pred
-             * @param pred
-             */
-            template<typename Pred>
-            void runAfterClientClosed(Pred&& pred) {
-                clientClosedFunc = std::bind([pred] (std::weak_ptr<MyClient>) -> void {
-                    pred();
-                }, std::placeholders::_1);
-            }
-
         protected:
+
+            /**
+             * 客户端连接成功回调
+             * @param client client
+             */
+            virtual void onConnect(std::shared_ptr<MyClient> client);
+
             /**
              * 发送数据
              */
@@ -259,8 +205,6 @@ namespace MF {
              * @return 心跳session
              */
             std::shared_ptr<MySession<void, void>> buildHeartbeatSession(std::shared_ptr<MyClient> client);
-
-//            std::shared_ptr<
 
             /**
              * 开启心跳
@@ -281,23 +225,6 @@ namespace MF {
              * @return buffer
              */
             virtual std::unique_ptr<Buffer::MyIOBuf> encode(const std::unique_ptr<Protocol::MyMessage>& message) = 0;
-
-            /**
-             * proxy可用
-             * @param client 可用的client
-             */
-            void onConnected(std::weak_ptr<MyClient> client) override;
-
-            /**
-             * 所有proxy都断开链接了
-             */
-            void onDisconnected() override;
-
-            /**
-             * 某一个客户端断连
-             * @param client
-             */
-            void onClientClosed(std::weak_ptr<MyClient> client) override;
 
         private:
         };
@@ -360,7 +287,6 @@ namespace MF {
 
             return session; //返回request
         }
-
     }
 }
 

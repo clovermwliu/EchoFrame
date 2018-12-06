@@ -16,6 +16,7 @@ int main(int argc, const char * argv[]) {
     //初始化server config
     ServerConfig serverConfig;
     serverConfig.ioThreadCount = 1;
+    serverConfig.routeServantName = "udpRouteServant";
     if(server->initServer(serverConfig) != 0) {
         LOG(ERROR) << "init server fail" << std::endl;
         return 0;
@@ -23,16 +24,16 @@ int main(int argc, const char * argv[]) {
 
     //初始化dispatcher
     ServantConfig servantConfig;
-    servantConfig.name = "tcpRouteServant";
-    servantConfig.host = "0.0.0.0";
-    servantConfig.port = 9998;
-    servantConfig.timeout = 30;
-    servantConfig.handlerThreadCount = 2;
+//    servantConfig.name = "tcpRouteServant";
+//    servantConfig.host = "0.0.0.0";
+//    servantConfig.port = 9998;
+//    servantConfig.timeout = 30;
+//    servantConfig.handlerThreadCount = 2;
     MyRouteDispatcher* dispatcher = new MyRouteDispatcher();
-    if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {
-        LOG(ERROR) << "create servant fail" << std::endl;
-        return 0;
-    }
+//    if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {
+//        LOG(ERROR) << "create servant fail" << std::endl;
+//        return 0;
+//    }
 
     servantConfig.name = "udpRouteServant";
     servantConfig.host = "0.0.0.0";

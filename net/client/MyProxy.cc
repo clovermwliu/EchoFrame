@@ -54,16 +54,8 @@ namespace MF {
                     client->setReadWatcher(readWatcher); //保存readwatcher
                     self->selector.addClient(client);
 
-                    //设置已连接
-                    self->handlerExecutor->exec([self, client] () -> int32_t {
-                        self->setConnected(client);
-                        return 0;
-                    });
-
-                    //开启心跳
-                    if (client->getConfig().needHeartbeat) {
-                        self->heartbeat(client);
-                    }
+                    //调用onConnect
+                    self->onConnect(client);
                 } else {
                     //连接失败，那么就10秒后再试一次
                     LOG(ERROR) << "connect fail, host: " << client->getConfig().host
@@ -78,26 +70,6 @@ namespace MF {
 
             return future.wait_for(std::chrono::seconds(0))
                    == std::future_status::ready ? future.get() : 0;
-        }
-
-        void MyProxy::setConnected(weak_ptr<MF::Client::MyClient> client) {
-            if (status == kProxyStatusDisconnected) { //未连接-->已连接
-                //调用回调
-                if (connectedFunc) {
-                    connectedFunc(client);
-                }
-            }
-
-            status = kProxyStatusConnected;
-        }
-
-        void MyProxy::setDisconnected() {
-            if (status == kProxyStatusConnected) {
-                if (disconnectedFunc) {
-                    disconnectedFunc(std::weak_ptr<MyClient>());
-                }
-            }
-            status = kProxyStatusDisconnected;
         }
 
         std::shared_ptr<MyClient> MyProxy::getClient() {
@@ -181,15 +153,6 @@ namespace MF {
 
         void MyProxy::onDisconnect(const std::shared_ptr<MyClient>& client) {
 
-            //先调用clientclose
-            auto self = shared_from_this();
-            handlerExecutor->exec([self, client] () -> int32_t {
-                if (self->clientClosedFunc) {
-                    self->clientClosedFunc(client);
-                }
-                return 0;
-            });
-
             //不需要自动重连
             if (!client->getConfig().autoReconnect) {
                 loops->removeClient(client);
@@ -198,14 +161,7 @@ namespace MF {
                 client->disconnect(); //先断开链接
                 client->getLoop()->RunInThreadAfterDelay([client] (EV::MyTimerWatcher*) -> void {
                     client->reconnect();
-                }, self->config.reconnectInterval);
-            }
-            //检查proxy是否还有可用的链接
-            if (getConnectedClientCount() == 0) {
-                self->handlerExecutor->exec([self] () -> int32_t {
-                    self->setDisconnected(); //设置proxy已断开
-                    return 0;
-                });
+                }, config.reconnectInterval);
             }
         }
 
@@ -320,6 +276,16 @@ namespace MF {
             this->initialize(this->config.clients);
         }
 
+        void ServantProxy::onConnect(std::shared_ptr<MyClient> client) {
+            //1. 调用父类处理
+            MyProxy::onConnect(client);
+
+            //2.开启心跳
+            if (client->getConfig().needHeartbeat) {
+                heartbeat(client);
+            }
+        }
+
         shared_ptr<MySession<void, void>> ServantProxy::buildHeartbeatSession(std::shared_ptr<MyClient> client) {
             //1. 获取client
             auto session = std::shared_ptr<MySession<void, void>>(
@@ -411,18 +377,6 @@ namespace MF {
                     client->setLastHeartbeatTime(MyTimeProvider::now());
                 }, std::placeholders::_1));
             }
-        }
-
-        void ServantProxy::onConnected(std::weak_ptr<MyClient> client) {
-
-        }
-
-        void ServantProxy::onDisconnected() {
-
-        }
-
-        void ServantProxy::onClientClosed(std::weak_ptr<MyClient> client) {
-
         }
     }
 }

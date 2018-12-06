@@ -19,7 +19,6 @@ namespace MF {
             //2. 构造request
             auto rspMsg = buildSession<MyRouteMessage, MyRouteMessage>(std::move(reqMsg))->executeAndWait();
             if (rspMsg == nullptr) {
-                LOG(ERROR) << "register servant fail" << std::endl;
                 return nullptr;
             }
 
@@ -34,7 +33,6 @@ namespace MF {
             //2. 构造request
             auto rspMsg = buildSession<MyRouteMessage, MyRouteMessage>(std::move(reqMsg))->executeAndWait();
             if (rspMsg == nullptr) {
-                LOG(ERROR) << "set servant status fail" << std::endl;
                 return nullptr;
             }
 
@@ -49,7 +47,6 @@ namespace MF {
             //2. 构造request
             auto rspMsg = buildSession<MyRouteMessage, MyRouteMessage>(std::move(reqMsg))->executeAndWait();
             if (rspMsg == nullptr) {
-                LOG(ERROR) << "send heartbeat fail" << std::endl;
                 return nullptr;
             }
 

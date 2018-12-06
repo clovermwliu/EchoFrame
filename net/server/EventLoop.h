@@ -148,11 +148,20 @@ namespace MF {
 
             /**
              *  @brief 等待io线程结束
+             *  @return true 所有线程已结束 false 还有线程未结束
              */
-            void wait() {
-                for (auto it = threads_.begin(); it != threads_.end(); ++it) {
-                    it->join();
+            bool wait() {
+                bool rv = true;
+                for (auto i = 0; i < loops_.size(); ++i) {
+                    auto lp = loops_[i];
+                    if (lp->exited()) {
+                        threads_[i].join();
+                        continue;
+                    }
+
+                    rv = false;
                 }
+                return rv;
             }
         protected:
 

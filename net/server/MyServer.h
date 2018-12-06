@@ -22,6 +22,7 @@ namespace MF {
          */
         struct ServerConfig {
             uint32_t ioThreadCount{0}; //io线程数
+            std::string routeServantName; //route servant name
         };
 
         /**

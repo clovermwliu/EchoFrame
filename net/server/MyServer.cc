@@ -29,7 +29,31 @@ namespace MF {
         }
 
         void MyServer::wait() {
-            this->loopManager->wait();
+            while(!loopManager->wait()) {
+                //检查是否需要注册节点
+                for (auto it = servantMap.begin(); it != servantMap.end(); ++it){
+                    if (it->second == nullptr
+                        || config.routeServantName.empty()
+                        || it->first == config.routeServantName) {
+                        continue;
+                    }
+
+                    //检查是否需要发送注册
+                    if (!it->second->isRegistered()) {
+                        LOG(INFO) << "register servant, name: " << it->first << std::endl;
+                        it->second->registerServant(config.routeServantName);
+                    }
+
+                    //检查是否需要发送心跳
+                    if (MyTimeProvider::now() - it->second->getLastSyncTime() > 1) {
+                        LOG(INFO) << "sync servant, name: " << it->first << std::endl;
+                        it->second->syncServant(config.routeServantName);
+                    }
+                }
+
+                //sleep1秒
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
         }
     }
 }

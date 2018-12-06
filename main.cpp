@@ -50,6 +50,7 @@ int main(int argc, const char * argv[]) {
     //初始化server config
     ServerConfig serverConfig;
     serverConfig.ioThreadCount = 1;
+    serverConfig.routeServantName = "udpRouteServant";
     if(server->initServer(serverConfig) != 0) {
         LOG(ERROR) << "init server fail" << std::endl;
         return 0;
@@ -68,15 +69,15 @@ int main(int argc, const char * argv[]) {
         return 0;
     }
 
-    servantConfig.name = "testServant2";
-    servantConfig.host = "0.0.0.0";
-    servantConfig.port = 8889;
-    servantConfig.timeout = 30;
-    servantConfig.handlerThreadCount = 2;
-    if (server->addServant<MyUdpServant>(servantConfig, dispatcher) !=  0) {
-        LOG(ERROR) << "create servant fail" << std::endl;
-        return 0;
-    }
+//    servantConfig.name = "testServant2";
+//    servantConfig.host = "0.0.0.0";
+//    servantConfig.port = 8889;
+//    servantConfig.timeout = 30;
+//    servantConfig.handlerThreadCount = 2;
+//    if (server->addServant<MyUdpServant>(servantConfig, dispatcher) !=  0) {
+//        LOG(ERROR) << "create servant fail" << std::endl;
+//        return 0;
+//    }
 
     //启动server
     if (server->startServer() != 0) {
