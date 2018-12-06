@@ -14,7 +14,6 @@ namespace MF {
             this->uid = static_cast<uint32_t >(socket->getfd()); //TODO: 先设置成fd
             this->readBuf = new Buffer::MySKBuffer(g_default_skbuffer_capacity);
             this->writeBuf= new Buffer::MySKBuffer(g_default_skbuffer_capacity);
-
             this->lastReceiveTime = MyTimeProvider::now();
         }
 
@@ -69,6 +68,14 @@ namespace MF {
             }
         }
 
+        bool MyChannel::checkTimeout() {
+            return onTimeoutFunc ? onTimeoutFunc(shared_from_this()) : false;
+        }
+
+        void MyChannel::setOnTimeoutFunc(MF::Server::MyChannel::OnTimeoutFunc &&func) {
+            onTimeoutFunc = func;
+        }
+
         EventLoop* MyChannel::getLoop() const {
             return loop;
         }
@@ -77,7 +84,7 @@ namespace MF {
             MyChannel::loop = loop;
         }
 
-        uint64_t MyChannel::getLastReceiveTime() const {
+        uint32_t MyChannel::getLastReceiveTime() const {
             return lastReceiveTime;
         }
 
@@ -137,20 +144,24 @@ namespace MF {
         }
 
         void MyTcpChannel::close() {
-            if (this->socket != nullptr) {
-                delete(this->socket);
+            if (socket != nullptr) {
+                delete(socket);
+                socket = nullptr;
             }
 
             if (readWatcher != nullptr) {
                 EV::MyWatcherManager::GetInstance()->destroy(readWatcher);
+                readWatcher = nullptr;
             }
 
             if (writeWatcher != nullptr) {
                 EV::MyWatcherManager::GetInstance()->destroy(writeWatcher);
+                writeWatcher = nullptr;
             }
 
             if (timeoutWatcher != nullptr) {
                 EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
+                timeoutWatcher = nullptr;
             }
         }
 
@@ -247,10 +258,12 @@ namespace MF {
         void MyUdpChannel::close() {
             if (writeWatcher != nullptr) {
                 EV::MyWatcherManager::GetInstance()->destroy(writeWatcher);
+                writeWatcher = nullptr;
             }
 
             if (timeoutWatcher != nullptr) {
                 EV::MyWatcherManager::GetInstance()->destroy(timeoutWatcher);
+                timeoutWatcher = nullptr;
             }
         }
     }

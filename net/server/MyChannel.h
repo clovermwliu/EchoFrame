@@ -15,11 +15,11 @@
 
 namespace MF {
     namespace Server {
-
         class EventLoop; //预定义
 
-        class MyChannel {
+        class MyChannel : public std::enable_shared_from_this<MyChannel>{
         public:
+            typedef std::function<bool (std::shared_ptr<MyChannel>)> OnTimeoutFunc;
             /**
              * 构造函数
              * @param socket socket
@@ -103,6 +103,17 @@ namespace MF {
             void resetTimer(uint32_t timeout);
 
             /**
+             * channel超时需要做的事情
+             */
+            bool checkTimeout();
+
+            /**
+             * 设置超时检查函数
+             * @param func
+             */
+            void setOnTimeoutFunc(OnTimeoutFunc&& func);
+
+            /**
              * 获取uid
              * @return uid
              */
@@ -114,15 +125,15 @@ namespace MF {
 
             void setLoop(EventLoop *loop);
 
-            uint64_t getLastReceiveTime() const;
+            uint32_t getLastReceiveTime() const;
 
         protected:
             uint64_t uid{0}; //连接的标识id
 
             Socket::MySocket* socket{nullptr}; //socket
-            EV::MyIOWatcher* readWatcher; //connectWatcher;
-            EV::MyAsyncWatcher* writeWatcher; //writeWatcher;
-            EV::MyTimerWatcher* timeoutWatcher; //timeout watcher
+            EV::MyIOWatcher* readWatcher{nullptr}; //connectWatcher;
+            EV::MyAsyncWatcher* writeWatcher{nullptr}; //writeWatcher;
+            EV::MyTimerWatcher* timeoutWatcher{nullptr}; //timeout watcher
             EventLoop* loop; //事件循环
 
             //write buffer
@@ -132,7 +143,9 @@ namespace MF {
             //read buffer
             Buffer::MySKBuffer* readBuf {nullptr};
 
-            uint64_t lastReceiveTime{0}; //最近一次接收到消息的时间
+            uint32_t lastReceiveTime{0}; //最近一次接收到消息的时间
+
+            OnTimeoutFunc onTimeoutFunc; //channel超时检查函数
         };
 
         /**

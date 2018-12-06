@@ -40,6 +40,7 @@ int main(int argc, const char * argv[]) {
     clientConfig.timeout = 3;
     clientConfig.autoReconnect = true;
     clientConfig.clientType = kClientTypeUdp;
+    clientConfig.needHeartbeat = false;
     std::vector<ClientConfig> clientConfigs;
     clientConfigs.push_back(clientConfig);
     MyCommunicator::GetInstance()->update(servantName, clientConfigs);
@@ -59,7 +60,7 @@ int main(int argc, const char * argv[]) {
     servantConfig.name = "testServant";
     servantConfig.host = "0.0.0.0";
     servantConfig.port = 8888;
-    servantConfig.timeout = 30;
+    servantConfig.timeout = 10;
     servantConfig.handlerThreadCount = 2;
     MyDemoDispatcher* dispatcher = new MyDemoDispatcher();
     if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {

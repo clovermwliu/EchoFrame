@@ -39,7 +39,12 @@ namespace MF {
             std::shared_ptr<MyChannel> findChannel(uint64_t uid);
 
         protected:
+            bool onIdle() override;
+
+        protected:
             std::map<uint64_t , std::shared_ptr<MyChannel> > channels; //连接map
+
+            uint32_t lastCheckTime {0};
         };
 
         class EventLoopManager {

@@ -30,7 +30,7 @@ namespace MF {
          * servant 类，用于适配loop、socket、dispatcher
          * servant 用于接受新连接、维护心跳已经检测断开链接等功能
          */
-        class MyServant {
+        class MyServant : public std::enable_shared_from_this<MyServant>{
         public:
             /**
              * 构造函数
@@ -80,7 +80,7 @@ namespace MF {
              * 客户端超时
              * @param watcher watchere
              */
-            void onTimeout(MF::EV::MyWatcher *watcher);
+            bool onTimeout(std::shared_ptr<MyChannel> channel);
 
             /**
              * 处理所有收到的数据包

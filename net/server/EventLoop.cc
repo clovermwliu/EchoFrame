@@ -74,5 +74,24 @@ namespace MF {
         std::shared_ptr<MyChannel> EventLoop::findChannel(uint64_t uid) {
             return channels.find(uid) != channels.end() ? channels[uid] : nullptr;
         }
+
+        bool EventLoop::onIdle() {
+            if (MyTimeProvider::now() - lastCheckTime < 1) { //没有检查
+                return false;
+            }
+
+            //检查是否有超时任务
+            auto it = channels.begin();
+            while (it != channels.end()) {
+                if (it->second->checkTimeout()) {
+                    it->second->close(); //关闭socket
+                    it = channels.erase(it);
+                } else {
+                    it++;
+                }
+            }
+
+            lastCheckTime = MyTimeProvider::now();
+        }
     }
 }

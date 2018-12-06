@@ -46,9 +46,10 @@ int main(int argc, const char * argv[]) {
     clientConfig.timeout = 3;
     clientConfig.autoReconnect = true;
     clientConfig.clientType = kClientTypeUdp;
+    clientConfig.needHeartbeat = true;
     clientConfig.heartbeatInterval = 5;
     std::vector<ClientConfig> clientConfigs;
-//    clientConfigs.push_back(clientConfig);
+    clientConfigs.push_back(clientConfig);
 
     //tcp client
     clientConfig.host = "0.0.0.0";
@@ -56,6 +57,7 @@ int main(int argc, const char * argv[]) {
     clientConfig.timeout = 3;
     clientConfig.autoReconnect = true;
     clientConfig.clientType = kClientTypeTcp;
+    clientConfig.needHeartbeat = true;
     clientConfig.heartbeatInterval = 5;
     clientConfigs.push_back(clientConfig);
     MyCommunicator::GetInstance()->update(servantName, clientConfigs);

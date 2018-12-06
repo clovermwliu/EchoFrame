@@ -14,6 +14,7 @@ namespace MF {
         enum enumFlag : uint8_t  {
             kFlagData = 0, //数据
             kFlagHeartbeat = 1, //心跳
+            kFlagRoute = 2, //路由
         };
         /**
          * 消息的基类

@@ -62,25 +62,14 @@ namespace MF {
         }
 
         //链接超时了，需要断开
-        void MyServant::onTimeout(MF::EV::MyWatcher *watcher) {
-            LOG(INFO) << "MyServant::onTimeout"<<std::endl;
-
-            //1. 获取uid
-            uint64_t uid = dynamic_cast<EV::MyTimerWatcher*>(watcher)->getUid();
-
-            //2. 检查channel是否有效
-            auto channel = loopManager->findChannel(uid);
-            if (channel == nullptr) {
-                LOG(ERROR) << "channel is null, uid: " << uid << std::endl;
-                return;
+        bool MyServant::onTimeout(std::shared_ptr<MyChannel> channel) {
+            //1. 检查是否超时
+            if (MyTimeProvider::now() - channel->getLastReceiveTime() < config.timeout) {
+                //还没有超时
+                return false;
             }
-
-            //3. 检查是否超时
-//            if (MyTimeProvider::now() - channel->getLastReceiveTime() <= config.timeout) {
-//                return;
-//            }
-
-            //3. 通知上层
+            LOG(INFO) << "MyServant::onTimeout" << std::endl;
+            //2. 通知上层
             auto context = std::make_shared<MyContext>(std::weak_ptr<MyChannel>(channel));
             auto future = handlerExecutor->exec([this, context] () -> int32_t {
                 //上层处理
@@ -93,8 +82,10 @@ namespace MF {
             if (rv == 0) {
                 //需要关闭socket
                 LOG(INFO) << "close connection, uid: " << channel->getUid() << std::endl;
-                loopManager->removeChannel(channel);
             }
+
+            //5. 无论上层处理结果，都是需要关闭socket的
+            return true;
         }
 
         void MyServant::handlePackets(shared_ptr<MF::Server::MyChannel> channel) {
@@ -238,9 +229,9 @@ namespace MF {
             loop->add(readWatcher);
 
             //5. 上报节点
-            if (this->config.name != this->routeServantName) {
-                registerServant();
-            }
+//            if (this->config.name != this->routeServantName) {
+//                registerServant();
+//            }
             return 0;
         }
 
@@ -274,23 +265,21 @@ namespace MF {
                     std::bind(&MyTcpServant::onRead, this, std::placeholders::_1), socket->getfd(), EV_READ);
             EV::MyAsyncWatcher* writeWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyAsyncWatcher>(
                     std::bind(&MyTcpServant::onWrite, this, std::placeholders::_1));
-            auto timeoutWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyTimerWatcher>(
-                    std::bind(&MyTcpServant::onTimeout, this, std::placeholders::_1), config.timeout, 0);
 
             //设置ev data
             ioWatcher->setUid(channel->getUid());
             writeWatcher->setUid(channel->getUid());
-            timeoutWatcher->setUid(channel->getUid());
 
             //开启事件监听
             ioLoop->add(ioWatcher);
             ioLoop->add(writeWatcher);
-            ioLoop->add(timeoutWatcher);
 
             //保存watcher
             channel->setReadWatcher(ioWatcher);
             channel->setWriteWatcher(writeWatcher);
-            channel->setTimeoutWatcher(timeoutWatcher);
+
+            //设置超时检查函数
+            channel->setOnTimeoutFunc(std::bind(&MyTcpServant::onTimeout, this, std::placeholders::_1));
 
             //保存iothread
             channel->setLoop(ioLoop);
@@ -313,7 +302,7 @@ namespace MF {
             }
 
             //有数据到到达了，重新设置超时定时器
-            channel->resetTimer(config.timeout);
+//            channel->resetTimer(config.timeout);
 
             //4. 使用channel读取数据
             auto rv = channel->onRead();
@@ -388,20 +377,19 @@ namespace MF {
             //构造watcher
             EV::MyAsyncWatcher* writeWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyAsyncWatcher>(
                     std::bind(&MyUdpServant::onWrite, this, std::placeholders::_1));
-            auto timeoutWatcher = EV::MyWatcherManager::GetInstance()->create<EV::MyTimerWatcher>(
-                    std::bind(&MyUdpServant::onTimeout, this, std::placeholders::_1), config.timeout, 0);
 
             //设置ev data
             writeWatcher->setUid(channel->getUid());
-            timeoutWatcher->setUid(channel->getUid());
 
             //开启事件监听
             ioLoop->add(writeWatcher);
-            ioLoop->add(timeoutWatcher);
 
             //保存watcher
             channel->setWriteWatcher(writeWatcher);
-            channel->setTimeoutWatcher(timeoutWatcher);
+
+            //设置超时检查函数
+            channel->setOnTimeoutFunc(std::bind(&MyUdpServant::onTimeout, this, std::placeholders::_1));
+
 
             //保存iothread
             channel->setLoop(ioLoop);
@@ -437,11 +425,12 @@ namespace MF {
                 && (channel = createChannel(this->socket, ip, port)) == nullptr) {
                 LOG(ERROR) << "create udp channel fail, uid: " << uid
                            << ", ip: " << ip << ", port: " << port << std::endl;
+
                 return nullptr;
             }
 
             //有数据到到达了，重新设置超时定时器
-            channel->resetTimer(config.timeout);
+//            channel->resetTimer(config.timeout);
 
             //4. 读取数据
             int32_t readLen = channel->onRead();
