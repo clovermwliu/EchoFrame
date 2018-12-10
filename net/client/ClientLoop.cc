@@ -34,7 +34,7 @@ namespace MF {
             return client;
         }
 
-        const std::map<uint32_t , std::shared_ptr<MyClient>>& ClientLoop::getClientMap() const {
+        const std::map<uint64_t , std::shared_ptr<MyClient>>& ClientLoop::getClientMap() const {
             return clients;
         }
 

@@ -3,7 +3,7 @@ project(MyFramework2)
 #include(proto/CMakeLists.txt)
 find_package(Protobuf REQUIRED)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(SOURCE_FILES
         net/buffer/myIOBuf.h
         net/buffer/MyIOReader.h
@@ -51,7 +51,8 @@ set(SOURCE_FILES
         route/MyRouteHandler.cc route/MyRouteHandler.h
         proto/BoxedMessage.h
         route/MyRouteDispatcher.cc route/MyRouteDispatcher.h
-        route/MyRouteProxy.cc route/MyRouteProxy.h)
+        route/MyRouteProxy.cc route/MyRouteProxy.h net/application/MyApplication.cc net/application/MyApplication.h)
+#        presistence/MyRedis.h presistence/MyRedis.cc)
 
 set(SERVER_MAIN main.cpp)
 set(CLIENT_MAIN client.cc)

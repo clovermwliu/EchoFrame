@@ -55,7 +55,7 @@ namespace MF{
              * 获取client map
              * @return client map
              */
-            const std::map<uint32_t , std::shared_ptr<MyClient>>& getClientMap() const;
+            const std::map<uint64_t , std::shared_ptr<MyClient>>& getClientMap() const;
 
             /**
              * 删除client
@@ -68,7 +68,7 @@ namespace MF{
 
         protected:
             //map<servantName, proxy>
-            std::map<uint32_t , std::shared_ptr<MyClient>> clients; //所有的proxy
+            std::map<uint64_t , std::shared_ptr<MyClient>> clients; //所有的proxy
             uint32_t lastCheckTime; //上一次check的时间
         };
 

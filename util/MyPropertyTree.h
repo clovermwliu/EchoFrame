@@ -11,8 +11,8 @@
 
 #include <string>
 #include <map>
-
-#include "util/MyVariant.h"
+#include <variant>
+#include "util/MyCommon.h"
 
 namespace MF {
     //节点类型
@@ -27,83 +27,113 @@ namespace MF {
     }PropertyType;
     
     //Property值
-    typedef MyVariant<uint64_t, bool, double, std::string> PropertyValue;
+    using PropertyValue = std::variant<int64_t , bool, double, std::string> ;
     
     /**
      *  @brief 定义property
      */
     struct MyProperty {
-        std::string k_; //字符串的key
-        PropertyValue v_; //value
+        std::string k; //字符串的key
+        PropertyValue v; //value
+        MyProperty(const std::string& k) {
+            this->k = k;
+        }
+
+        /**
+         * 设置值
+         * @tparam T
+         * @param v
+         */
         template<typename T>
-        MyProperty(const std::string& k, const T& v) {
-            k_ = k;
-            v_.set(v);
+        void set(const T& v) {
+            this->v = v;
+        }
+
+        /**
+         * 获取值
+         * @tparam T
+         * @return  对应的值
+         */
+        template<typename T>
+        T get() const {
+            T t;
+            try {
+                t = std::get<T>(v);
+            } catch (const std::bad_variant_access& e) {
+            }
+
+            return t;
         }
     };
     //属性树节点
     struct MyPropertyTreeNode : std::enable_shared_from_this<MyPropertyTreeNode>{
-        std::shared_ptr<MyProperty> property_; //属性
-        PropertyType type_{kPropertyTypeTrunk}; //属性
-        std::shared_ptr<MyPropertyTreeNode> parent_{nullptr}; //父节点
-        std::map<std::string, std::shared_ptr<MyPropertyTreeNode>> childs_;//子节点
+        std::shared_ptr<MyProperty> propertyPtr; //属性
+        PropertyType type{kPropertyTypeTrunk}; //属性
+        std::shared_ptr<MyPropertyTreeNode> parentNode {nullptr}; //父节点
+        std::map<std::string, std::shared_ptr<MyPropertyTreeNode>> childs;//子节点
         
         MyPropertyTreeNode(const std::string& key) {
-            property_ = std::make_shared<MyProperty>(key, false);
+            propertyPtr = std::make_shared<MyProperty>(key);
         }
-        
-        //写入一个节点
-        template<typename T>
-        void set(const T& v) {
-            if(std::is_same<typename std::decay<T>::type, bool>::value) {
-                type_ = kPropertyTypeBool;
-            } else if (std::is_same<typename std::decay<T>::type, std::string>::value) {
-                type_ = kPropertyTypeString;
-            } else if (std::is_floating_point<typename std::decay<T>::type>::value) {
-                type_ = kPropertyTypeFloating;
-            } else if (std::is_integral<typename std::decay<T>::type>::value) {
-                type_ = kPropertyTypeIntegral;
-            } else {
-                throw MyException("property is not supported");
-            }
-            property_->v_.set(v);
+
+        void set(int64_t v) {
+            type = kPropertyTypeIntegral;
+            propertyPtr->set(v);
         }
-        
+
+        void set(bool v) {
+            type = kPropertyTypeBool;
+            propertyPtr->set(v);
+        }
+
+        void set(const std::string& v) {
+            type = kPropertyTypeString;
+            propertyPtr->set(v);
+        }
+
+        void set(double v) {
+            type = kPropertyTypeFloating;
+            propertyPtr->set(v);
+        }
+
         //写入array
         template<typename T>
-        void push_back(const T& v) {
-            if(type_ != kPropertyTypeTrunk && type_ != kPropertyTypeArray)
-                throw MyException("Property is not array"); //非array
-            
+        void add(const T &v) {
+            if(type != kPropertyTypeTrunk && type != kPropertyTypeArray) {
+                return;
+            }
+
             //1. 获取索引
-            uint32_t idx = MyCast::to<uint32_t>(childs_.size());
+            auto idx = static_cast<uint32_t >(childs.size());
             
             //2. 写入一个子节点
-            std::shared_ptr<MyPropertyTreeNode> child = std::make_shared<MyPropertyTreeNode>(MyCommon::tostr(idx));
-            child->set<typename std::decay<T>::type>(v);
-            child->parent_ = shared_from_this();
-            childs_[child->property_->k_] = child;
-            type_ = kPropertyTypeArray;
+            std::shared_ptr<MyPropertyTreeNode> child =
+                    std::make_shared<MyPropertyTreeNode>(MyCommon::tostr(idx));
+            child->set(v);
+            child->parentNode = shared_from_this();
+            childs[child->propertyPtr->k] = child;
+            type = kPropertyTypeArray;
         }
         
         //获取值
         template<typename T>
         typename std::decay<T>::type get() {
-            if(type_ == kPropertyTypeTrunk
-               &&  type_ == kPropertyTypeArray
-               && type_ == kPropertyTypeNull)
-                throw MyException("Property incorrect"); //错误的类型
-            return property_->v_.as<T>();
+            T t;
+            if(type == kPropertyTypeTrunk
+               &&  type == kPropertyTypeArray
+               && type == kPropertyTypeNull)
+                return t;
+            return propertyPtr->get<T>();
         }
         
         //获取array
         template<typename T>
         typename std::decay<T>::type at(uint32_t idx) {
-            if(type_ != kPropertyTypeArray)
+            if(type != kPropertyTypeArray)
                 throw MyException("Property is not array");
             
-            auto it = childs_.find(MyCommon::tostr(idx));
-            if(it == childs_.end())
+            auto it = childs.find(MyCommon::tostr(idx));
+            if(it == childs.end())
                 throw MyException("index overflow");
             
             return it->second->get<typename std::decay<T>::type>();
@@ -111,11 +141,11 @@ namespace MF {
         
         template<typename T>
         std::vector<typename std::decay<T>::type> get_array() {
-            if(type_ != kPropertyTypeArray)
+            if(type != kPropertyTypeArray)
                 throw MyException("Property is not array");
             
             std::vector<typename std::decay<T>::type> v;
-            for(auto it = childs_.begin(); it != childs_.end(); ++it) {
+            for(auto it = childs.begin(); it != childs.end(); ++it) {
                 v.push_back(it->second->get<T>());
             }
             
@@ -123,20 +153,20 @@ namespace MF {
         }
         
         uint32_t array_size() const {
-            return static_cast<uint32_t>(childs_.size());
+            return static_cast<uint32_t>(childs.size());
         }
         
         //增加一个child
         void add_child(std::shared_ptr<MyPropertyTreeNode> child) {
-            child->parent_ = shared_from_this();
-            childs_[child->property_->k_] = child;
+            child->parentNode = shared_from_this();
+            childs[child->propertyPtr->k] = child;
         }
         
         //获取一个节点
         std::shared_ptr<MyPropertyTreeNode> get_child(const std::string& k) {
             std::shared_ptr<MyPropertyTreeNode> child = nullptr;
-            auto it = childs_.find(k);
-            if(it != childs_.end()) { //获取子节点
+            auto it = childs.find(k);
+            if(it != childs.end()) { //获取子节点
                 child = it->second;
             }
             
@@ -144,37 +174,37 @@ namespace MF {
         }
         
         std::shared_ptr<MyPropertyTreeNode> parent() {
-            return parent_;
+            return parentNode;
         }
         
         
         //判断类型
         bool is_integral() const {
-            return type_ == kPropertyTypeIntegral;
+            return type == kPropertyTypeIntegral;
         }
         
         bool is_bool() const {
-            return type_ == kPropertyTypeBool;
+            return type == kPropertyTypeBool;
         }
         
         bool is_string() const {
-            return type_ == kPropertyTypeString;
+            return type == kPropertyTypeString;
         }
         
         bool is_floating() const {
-            return type_ == kPropertyTypeFloating;
+            return type == kPropertyTypeFloating;
         }
         
         bool is_null() const {
-            return type_ == kPropertyTypeNull;
+            return type == kPropertyTypeNull;
         }
         
         bool is_array() const {
-            return type_ == kPropertyTypeArray;
+            return type == kPropertyTypeArray;
         }
         
         bool is_trunk() const {
-            return type_ == kPropertyTypeTrunk;
+            return type == kPropertyTypeTrunk;
         }
     };
     
@@ -332,7 +362,7 @@ namespace MF {
         //4. 获取子节点
         child = child->get_child(k);
         if (child ) { //找到了
-            rv = child->property_->v_.as<T>();
+            rv = child->propertyPtr->get<T>();
         }
         return rv;
     }
@@ -468,7 +498,7 @@ namespace MF {
         if (!node) {
             node = std::make_shared<MyPropertyTreeNode>(k);
         }
-        node->push_back(v);
+        node->add(v);
         parent->add_child(node);
     }
     

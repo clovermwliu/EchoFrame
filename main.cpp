@@ -63,6 +63,7 @@ int main(int argc, const char * argv[]) {
     servantConfig.port = 8888;
     servantConfig.timeout = 10;
     servantConfig.handlerThreadCount = 2;
+    servantConfig.version = 1;
     MyDemoDispatcher* dispatcher = new MyDemoDispatcher();
     if (server->addServant<MyTcpServant>(servantConfig, dispatcher) !=  0) {
         LOG(ERROR) << "create servant fail" << std::endl;

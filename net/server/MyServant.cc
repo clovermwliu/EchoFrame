@@ -199,6 +199,7 @@ namespace MF {
             }
             auto req = std::unique_ptr<Heartbeat>(new Heartbeat());
             req->set_version(config.version);
+            LOG(INFO)<< "content: " << req->ShortDebugString() << std::endl;
             auto rsp = proxy->heartbeat(std::move(req));
             if (rsp == nullptr) {
                 LOG(ERROR) << "sync servant fail, name: " << config.name

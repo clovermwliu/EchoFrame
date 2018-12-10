@@ -57,11 +57,11 @@ namespace MF {
         XMLDocument doc_; //xml解析器
     };
     
-    class MyConfig2 {
+    class MyConfig {
     public:
         
         //构造解析器
-        MyConfig2(std::shared_ptr<MyConfigFileParser> parser) {
+        MyConfig(std::shared_ptr<MyConfigFileParser> parser) {
             parser_ = parser;
         }
         
@@ -99,16 +99,16 @@ namespace MF {
     class MyConfigManager : public MySingleton<MyConfigManager> {
     public:
         MyConfigManager() {
-            auto func = [] (std::shared_ptr<MyConfigFileParser> ptr) -> std::shared_ptr<MyConfig2> {
-                return std::make_shared<MyConfig2>(ptr);
+            auto func = [] (std::shared_ptr<MyConfigFileParser> ptr) -> std::shared_ptr<MyConfig> {
+                return std::make_shared<MyConfig>(ptr);
             };
             factory_.RegisterCreator(MAKE_NAME(MyConfig2), std::move(func));
         }
         
         //加载配置文件
         template<typename T, class... Args>
-        std::shared_ptr<MyConfig2> LoadFile(const std::string& path, Args... args) {
-            std::shared_ptr<MyConfig2> config = factory_.MakeObject(MAKE_NAME(MyConfig2), std::make_shared<T>(args...));
+        std::shared_ptr<MyConfig> LoadFile(const std::string& path, Args... args) {
+            std::shared_ptr<MyConfig> config = factory_.MakeObject(MAKE_NAME(MyConfig2), std::make_shared<T>(args...));
             if(!config->LoadFile(path)) {
                 config.reset();
             }
@@ -117,7 +117,7 @@ namespace MF {
         }
     protected:
     private:
-        typedef MyPointerFactory<std::string, std::shared_ptr<MyConfig2>, std::shared_ptr<MyConfigFileParser>> MyConfigFactory;
+        typedef MyPointerFactory<std::string, std::shared_ptr<MyConfig>, std::shared_ptr<MyConfigFileParser>> MyConfigFactory;
       
         MyConfigFactory factory_; //工厂
     };

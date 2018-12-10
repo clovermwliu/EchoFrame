@@ -77,8 +77,8 @@ namespace MF {
         }
         
         //3. 获取child包含的节点
-        for (auto it = child->childs_.begin(); it != child->childs_.end(); ++it) {
-            v.push_back(it->second->property_->k_);
+        for (auto it = child->childs.begin(); it != child->childs.end(); ++it) {
+            v.push_back(it->second->propertyPtr->k);
         }
         
         return v;

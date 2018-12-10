@@ -20,7 +20,7 @@ namespace MF {
         /**
          * 通信器，用于管理多个Proxy
          */
-        class MyCommunicator : public MySingleton<MyCommunicator>{
+        class MyCommunicator {
         public:
 
             void initialize(const CommConfig& config){
@@ -79,15 +79,6 @@ namespace MF {
 
             std::map<std::string, ProxyConfig> proxyConfigs;
         };
-
-//        void MyCommunicator::initialize(const MF::Client::CommConfig &config) {
-//
-//        }
-//
-//        void MyCommunicator::update(const std::string &servantName
-//                , const vector<MF::Client::ClientConfig> &config) {
-//
-//        }
 
         template<typename T>
         std::shared_ptr<T> MyCommunicator::getServantProxy(const std::string &servantName) {
